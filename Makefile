@@ -4,13 +4,6 @@ CCOMP=gcc
 FLAGS=-std=c++11 --std=gnu++11 -fPIC
 PREFIX ?=/usr/local
 
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-	CELLAR=$(shell brew info argp-standalone | grep Cellar | cut -d' ' -f1)
-	FLAGS += -I$(CELLAR)/include/
-	LDFLAGS += -L$(CELLAR)/lib/ -largp
-endif
-
 all: lib/libmixturedist.so
 
 lib/libmixturedist.so: build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
