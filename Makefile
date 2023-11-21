@@ -1,22 +1,24 @@
-SHELL=/bin/bash
+SHELL=bash
 COMP=g++
 CCOMP=gcc
-FLAGS=-std=c++11 --std=gnu++11 -fPIC
 PREFIX ?=/usr/local
+FLAGS=-std=c++11 --std=gnu++11 -fPIC
+IFLAGS=-I$(PREFIX)/include
+LFLAGS=-L$(PREFIX)/lib
 
 all: lib/libmixturedist.so
 
 lib/libmixturedist.so: build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
-	$(CCOMP) -shared -o lib/libmixturedist.so build/cdflib.o build/functions.o build/incbeta.o build/mixtureDist.o build/mixtureModel.o -lstdc++
+	$(CCOMP) $(IFLAGS) $(LFLAGS) -shared -o lib/libmixturedist.so build/cdflib.o build/functions.o build/incbeta.o build/mixtureDist.o build/mixtureModel.o -lstdc++
 
 build/mixtureModel.o: src/mixtureModel.cpp src/mixtureDist.h build/mixtureDist.o
-	$(COMP) $(FLAGS) -c src/mixtureModel.cpp -o build/mixtureModel.o
+	$(COMP) $(FLAGS) $(IFLAGS) -c src/mixtureModel.cpp -o build/mixtureModel.o
 
 build/mixtureDist.o: src/mixtureDist.cpp src/functions.h build/functions.o
-	$(COMP) $(FLAGS) -c src/mixtureDist.cpp -o build/mixtureDist.o
+	$(COMP) $(FLAGS) $(IFLAGS) -c src/mixtureDist.cpp -o build/mixtureDist.o
 
 build/functions.o: src/functions.cpp src/functions.h src/incbeta.h src/cdflib.h build/cdflib.o build/incbeta.o
-	$(COMP) $(FLAGS) -c src/functions.cpp -o build/functions.o
+	$(COMP) $(FLAGS) $(IFLAGS) -c src/functions.cpp -o build/functions.o
 
 build/cdflib.o: src/cdflib.c src/cdflib.h
 	$(CCOMP) -fPIC -c src/cdflib.c -o build/cdflib.o
@@ -26,10 +28,10 @@ build/incbeta.o: src/incbeta.c src/incbeta.h
 
 clean:
 	rm build/*.o
-	rm lib/libmixturedist.so
+	rm lib/*.so
 
 install: | $(PREFIX)/lib $(PREFIX)/include/mixtureDist
-	cp lib/libmixturedist.so $(PREFIX)/lib
+	cp lib/*.so $(PREFIX)/lib
 	cp src/mixtureDist.h $(PREFIX)/include/mixtureDist
 	cp src/mixtureModel.h $(PREFIX)/include/mixtureDist
 	cp src/functions.h $(PREFIX)/include/mixtureDist
