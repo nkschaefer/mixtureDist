@@ -11,6 +11,7 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <functional>
 #include <cstdlib>
 #include <utility>
 #include <math.h>
@@ -602,6 +603,9 @@ void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight){
     }
     for (int i = 0; i < npar; ++i){
         fprintf(stderr, " %.3f", this->params[idx][i]);
+        if (this->params_frozen[idx][i]){
+            fprintf(stderr, "*");
+        }
     }
     fprintf(stderr, " ]\n");
 }
@@ -616,8 +620,12 @@ void mixtureDist::print(int indentation_level){
         if (this->name != ""){
             namestr = this->name + ": ";
         }
-        fprintf(stderr, "%s%sDist with %d components:\n", indent_str.c_str(), namestr.c_str(),
-            this->n_components);
+        string frzstr = "";
+        if (this->frozen){
+            frzstr = "frozen ";
+        }
+        fprintf(stderr, "%s%s%sDist with %d components:\n", frzstr.c_str(), 
+            indent_str.c_str(), namestr.c_str(), this->n_components);
         indent_str += "   ";
         // Don't print weights if they're identical
         double weight1 = this->weights[0];
