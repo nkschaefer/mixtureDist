@@ -24,8 +24,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ==========
-The files src/incbeta.c and src/incbeta.h are under the zlib license (below)
+The files src/incbeta.c and src/incbeta.h were created by the author
+Lewis Van Winkle
+http://CodePlea.com
+And are under the zlib license (below)
 ==========
+Copyright (c) 2016, 2017 Lewis Van Winkle
+http://CodePlea.com
+
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
 arising from the use of this software.
@@ -44,7 +50,15 @@ freely, subject to the following restrictions:
 
 
 ==========
-The files src/cdflib.c and src/cdflib.h are under the GNU LGPL (below)
+The files src/cdflib.c and src/cdflib.h were created by the authors:
+Barry Brown, James Lovato, Kathy Russell,
+Department of Biomathematics,
+University of Texas,
+Houston, Texas
+
+And made available at this website: 
+https://people.sc.fsu.edu/~jburkardt/c_src/cdflib/cdflib.html
+under the GNU LGPL (below)
 ==========
 
 GNU LESSER GENERAL PUBLIC LICENSE
