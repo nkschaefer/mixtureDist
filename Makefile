@@ -6,11 +6,14 @@ FLAGS=-std=c++11 --std=gnu++11 -fPIC
 IFLAGS=-I$(PREFIX)/include
 LFLAGS=-L$(PREFIX)/lib
 
-all: lib/libmixturedist.so
+all: lib/libmixturedist.so lib/libmixturedist.a
 
 lib/libmixturedist.so: build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
 	$(CCOMP) $(IFLAGS) $(LFLAGS) -shared -o lib/libmixturedist.so build/cdflib.o build/functions.o build/incbeta.o build/mixtureDist.o build/mixtureModel.o -lstdc++
 
+lib/libmixturedist.a: build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
+	ar rcs lib/libmixturedist.a build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
+ 	
 build/mixtureModel.o: src/mixtureModel.cpp src/mixtureDist.h build/mixtureDist.o
 	$(COMP) $(FLAGS) $(IFLAGS) -c src/mixtureModel.cpp -o build/mixtureModel.o
 
