@@ -35,6 +35,7 @@ clean:
 
 install: | $(PREFIX)/lib $(PREFIX)/include/mixtureDist
 	cp lib/*.so $(PREFIX)/lib
+	cp lib/*.a $(PREFIX)/lib
 	cp src/mixtureDist.h $(PREFIX)/include/mixtureDist
 	cp src/mixtureModel.h $(PREFIX)/include/mixtureDist
 	cp src/functions.h $(PREFIX)/include/mixtureDist
