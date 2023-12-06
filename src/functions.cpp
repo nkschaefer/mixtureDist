@@ -124,11 +124,11 @@ double dpois(double x, double l){
 /**
  * CDF of Poisson distribution at x with mean l
  */
-double ppois(int x, int l){
+double ppois(double x, double l){
     double p;
     double q;
-    double s = (double)x;
-    double xlam = (double)l;
+    double s = x;
+    double xlam = l;
     cumpoi(&s, &xlam, &p, &q);
     return p;
 }
@@ -383,3 +383,12 @@ double dbinom_approx(int n, int k, double frac){
     return dnorm(k, mu, sigma);
 }
 
+/**
+ * CDF of Chi-Squared distribution with df degrees of freedom
+ */
+double pchisq(double x, double df){
+    double p;
+    double q;
+    cumchi(&x, &df, &p, &q);
+    return p;
+}

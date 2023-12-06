@@ -28,7 +28,7 @@ std::pair<double, double> welford(std::vector<double>& vals);
 // ===== PROBABILITY DISTRIBUTIONS =====
 
 double dpois(double x, double l);
-double ppois(int x, int l);
+double ppois(double x, double l);
 double dgamma(double x, double a, double b);
 double pgamma(double x, double a, double b);
 std::pair<double, double> gamma_moments(double mu, double var);
@@ -48,5 +48,6 @@ double dhyper(int N, int K, int n, int k);
 double dnorm(double x, double mu, double sigma);
 double cnorm(double x, double mu, double sigma);
 double dbinom_approx(int n, int k, double frac);
+double pchisq(double x, double df);
 
 #endif
