@@ -415,6 +415,7 @@ mixtureDist::mixtureDist(string name){
     if (! this->add_dist(name)){
         exit(1);
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(string name, vector<double> params_input){
@@ -423,6 +424,7 @@ mixtureDist::mixtureDist(string name, vector<double> params_input){
     if (!this->add_dist(name, params_input)){
         exit(1);
     }
+    this->frozen = false;
 }
 
 /**
@@ -436,6 +438,7 @@ mixtureDist::mixtureDist(string name, double param){
     if (!this->add_dist(name, params_input)){
         exit(1);
     }
+    this->frozen = false;
 }
 
 /**
@@ -451,6 +454,7 @@ mixtureDist::mixtureDist(string name, double param, bool frozen){
     if (!this->add_dist(name, params_input, params_input_frozen)){
         exit(1);
     }
+    this->frozen = false;
 }
 
 /**
@@ -465,6 +469,7 @@ mixtureDist::mixtureDist(string name, double param1, double param2){
     if (!this->add_dist(name, params_input)){
         exit(1);
     }
+    this->frozen = false;
 }
 
 /**
@@ -482,6 +487,7 @@ mixtureDist::mixtureDist(string name, double param1, double param2, bool frozen1
     if (!this->add_dist(name, params_input, params_input_frozen)){
         exit(1);
     }
+    this->frozen = false;
 }
 // Initialize a compound distribution
 
@@ -493,6 +499,7 @@ mixtureDist::mixtureDist(vector<string> names){
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_input){
@@ -503,6 +510,7 @@ mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_in
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_input,
@@ -514,6 +522,7 @@ mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_in
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(vector<string> names, vector<double> weights){
@@ -524,6 +533,7 @@ mixtureDist::mixtureDist(vector<string> names, vector<double> weights){
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_input, vector<double> weights){
@@ -534,6 +544,7 @@ mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_in
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_input,
@@ -545,6 +556,7 @@ mixtureDist::mixtureDist(vector<string> names, vector<vector<double> > params_in
             exit(1);
         }
     }
+    this->frozen = false;
 }
 
 double mixtureDist::loglik( const vector<double>& inputs ){
