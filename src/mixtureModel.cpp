@@ -357,6 +357,15 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         return this->fit_single(obs, obs_weights);
     }
     
+    // Is every component distribution frozen -- i.e. no need to update?
+    bool all_frozen = true;
+    for (int j = 0; j < this->n_components; ++j){
+        if (!this->dists[j].frozen){
+            all_frozen = false;
+            break;
+        }
+    } 
+
     // Need to create "responsibility matrix," storing the likelihoods of 
     // observations under each distribution multiplied by distribution weight
     // and normalized so that rows sum to 1. We make this accessible to outside
@@ -586,6 +595,10 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         }
         
         double loglik = this->compute_loglik(obs); 
+        if (isinf(loglik)){
+            fprintf(stderr, "LL inf\n");
+            exit(1);
+        }
 
         if (this->print_lls){
             fprintf(stderr, "LL %.3f -> %.3f (Improvement: %.3f)\n", loglik_prev/log2(exp(1)), 
@@ -598,12 +611,19 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         }
 
         //delta = abs(loglik-loglik_prev);
-        delta = loglik-loglik_prev;
-        if (isnan(delta)){
-            fprintf(stderr, "delta NAN %f %f\n", loglik_prev, loglik);
-            this->print();
-            exit(1);
+        
+        if (all_frozen){
+            delta = 0.0;
         }
+        else{
+            delta = loglik-loglik_prev;
+            if (isnan(delta)){
+                fprintf(stderr, "delta NAN %f %f\n", loglik_prev, loglik);
+                this->print();
+                exit(1);
+            }
+        }
+
         loglik_prev = loglik;
         ++its;
 
@@ -664,7 +684,7 @@ double mixtureModel::compute_loglik(const vector<vector<double> >& obs){
     }
     
     bool one_component = n_components_pos == 1;
-
+    
     for (int i = 0; i < obs.size(); ++i){
         double ll_row[n_components];
         double ll_row_max = 0.0;
@@ -682,9 +702,19 @@ double mixtureModel::compute_loglik(const vector<vector<double> >& obs){
         }
         double row_sum = 0.0;
         for (int j = 0; j < this->n_components; ++j){
-            row_sum += pow(2, ll_row[j] - ll_row_max);
+            if (this->weights[j] > 0){
+                row_sum += pow(2, ll_row[j] - ll_row_max);
+            }
         }
         loglik += log2(row_sum) + ll_row_max;
+        if (isinf(loglik)){
+            fprintf(stderr, "LL inf\n");
+            fprintf(stderr, "row sum %f\n", row_sum);
+            fprintf(stderr, "lrowsum %f\n", log2(row_sum));
+            fprintf(stderr, "max %f\n", ll_row_max);
+            this->print();
+            exit(1);
+        }
     }
     return loglik;
 }
