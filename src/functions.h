@@ -34,7 +34,7 @@ double pgamma(double x, double a, double b);
 std::pair<double, double> gamma_moments(double mu, double var);
 double dexp(float x, float l);
 double dbetabin(double x, double n, double a, double b);
-double dlbeta(double x, double a, double b);
+double dbeta(double x, double a, double b);
 double pbeta(double x, double a, double b);
 std::pair<double, double> beta_moments(double mean, double var);
 double dnbinom(int x, int mu, double phi);

@@ -15,8 +15,8 @@
 #include <utility>
 #include <math.h>
 #include "functions.h"
-#include "incbeta.h"
-#include "cdflib.h"
+#include "incbeta/incbeta.h"
+#include "cdflib/cdflib.h"
 
 using std::cout;
 using std::endl;
@@ -208,7 +208,7 @@ double dbetabin(double x, double n, double a, double b){
 /**
  * Log2 PDF of beta distribution
  */
-double dlbeta(double x, double a, double b){
+double dbeta(double x, double a, double b){
     float term1 = (a-1) * log2(x);
     float term2 = (b-1) * log2(1.0-x);
     float term3 = lbetaf(a, b);
@@ -333,7 +333,8 @@ double ddirichlet(const vector<double>& x, const vector<double>& alpha){
     }
     if (xsum != 1.0){
         fprintf(stderr, "ERROR: dldirichlet: x vector does not sum to 1 (%f)\n", xsum);
-        exit(1);
+        //exit(1);
+        return log(0);
     }
     double betaprod = 0.0;
     double betadenom = lgammaf(alpha_0);

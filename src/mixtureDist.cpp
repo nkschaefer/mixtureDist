@@ -83,7 +83,7 @@ double mixtureDist::ll_beta(const vector<double>& input,
     int start_idx,
     int n_inputs, 
     const vector<double>& params){
-    return dlbeta(input[start_idx], params[0], params[1]);
+    return dbeta(input[start_idx], params[0], params[1]);
 }
 bool mixtureDist::update_beta(const vector<double>& means,
     const vector<double>& vars,
