@@ -24,6 +24,8 @@ double factorial(int n);
 double lbetaf(double a, double b);
 long double betaf(double a, double b);
 std::pair<double, double> welford(std::vector<double>& vals);
+std::pair<double, double> welford_weights(std::vector<double>& vals,
+    std::vector<double>& weights, bool freq_weights);
 
 // ===== PROBABILITY DISTRIBUTIONS =====
 
@@ -46,7 +48,7 @@ double dmultinom(const std::vector<double>& x, const std::vector<double>& p);
 double ddirichlet(const std::vector<double>& x, const std::vector<double>& alpha);
 double dhyper(int N, int K, int n, int k);
 double dnorm(double x, double mu, double sigma);
-double cnorm(double x, double mu, double sigma);
+double pnorm(double x, double mu, double sigma);
 double dbinom_approx(int n, int k, double frac);
 double pchisq(double x, double df);
 

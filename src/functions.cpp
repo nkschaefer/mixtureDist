@@ -108,6 +108,43 @@ pair<double, double> welford(vector<double>& vals){
     return make_pair(mean, M2/(count-1.0));
 
 }
+
+/**
+ * Welford's algorithm for computing mean and variance in a single pass
+ * but with weights included
+ *
+ * From West (1979) as shown on https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Weighted_incremental_algorithm
+ *
+ * Returns pair of (mean, variance)
+ *
+ * Third argument = true if weights represent frequency; false if they represent reliability.
+ */
+pair<double, double> welford_weights(vector<double>& vals, 
+    vector<double>& weights, bool freq_weights){
+    double w_sum = 0.0;
+    double w_sum2 = 0.0;
+    double mean = 0.0;
+    double S = 0.0;
+
+    for (int i = 0; i < vals.size(); ++i){
+        w_sum = w_sum + weights[i];
+        w_sum2 = w_sum2 + weights[i] * weights[i];
+        double mean_old = mean;
+        mean = mean_old + (weights[i] / w_sum) * (vals[i] - mean_old);
+        S = S + weights[i] * (vals[i] - mean_old) * (vals[i] - mean);
+    }
+    
+    double pop_var = S / w_sum;
+    double var;
+    if (freq_weights){
+        var = S / (w_sum - 1.0);
+    }
+    else{
+        var = S / (w_sum - w_sum2 / w_sum);
+    }
+    return make_pair(mean, var);
+}
+
 // ===== Probability distributions and related functions =====
 
 /**
@@ -371,7 +408,7 @@ double dnorm(double x, double mu, double sigma){
 /**
  * CDF of normal distribution
  */
-double cnorm(double x, double mu, double sigma){
+double pnorm(double x, double mu, double sigma){
     return 0.5 * erfc(-((x-mu)/sigma) * M_SQRT1_2);
 }
 
