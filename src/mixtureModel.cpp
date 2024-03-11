@@ -41,6 +41,8 @@ void mixtureModel::init(vector<mixtureDist>& dists_init,
     
     this->print_lls = false;
     this->print_dists = false;
+    
+    this->has_callback_fun = false;
 }
 
 void mixtureModel::init_responsibility_matrix(int n_obs){
@@ -85,6 +87,7 @@ mixtureModel::mixtureModel(){
     this->maxits = 1000;
     this->print_lls = false;
     this->print_dists = false;
+    this->has_callback_fun = false;
 }
 
 mixtureModel::mixtureModel(const mixtureModel& m){
@@ -106,8 +109,9 @@ mixtureModel::mixtureModel(const mixtureModel& m){
     this->maxits = m.maxits;
     this->assignments = m.assignments;
     
-    this->shared_params_groups = m.shared_params_groups;
-    this->shared_params_callbacks = m.shared_params_callbacks;
+    this->callback_fun = m.callback_fun;
+    this->has_callback_fun = m.has_callback_fun; 
+    this->shared_params = m.shared_params;
 
     for (int i = 0; i < m.n_components; ++i){
         this->weights.push_back(m.weights[i]);
@@ -198,6 +202,9 @@ mixtureModel::mixtureModel(string dist_name, vector<pair<double, double> > param
     this->init(dists, weights);
 }
 
+/**
+ * Destructor
+ */
 mixtureModel::~mixtureModel(){
     this->weights.clear();
     this->assignments.clear();
@@ -231,26 +238,17 @@ void mixtureModel::set_verbosity(short level){
     }
 }
 
-bool mixtureModel::set_shared_params(vector<int> dist_inds, shared_params_callback callback_func){
+bool mixtureModel::set_callback(callback callback_func){
     vector<double> meta_params_empty;
-    return this->set_shared_params(dist_inds, callback_func, meta_params_empty);
+    return this->set_callback(callback_func, meta_params_empty);
 }
 
-bool mixtureModel::set_shared_params(vector<int> dist_inds, shared_params_callback callback_func,
+bool mixtureModel::set_callback(callback callback_func,
     vector<double> meta_params){
     
-    // Ensure that all  dists in the set are valid indices
-    set<int> dist_inds_set;
-    for (vector<int>::iterator i = dist_inds.begin(); i != dist_inds.end(); ++i){
-        if (*i < 0 || *i > this->n_components-1){
-            fprintf(stderr, "ERROR: invalid distribution index given in shared parameter set\n");
-            return false;
-        }
-        dist_inds_set.insert(*i);
-    }
-    this->shared_params_groups.push_back(dist_inds_set);
-    this->shared_params_callbacks.push_back(callback_func);
-    this->shared_params.push_back(meta_params);
+    this->has_callback_fun = true;
+    this->callback_fun = callback_func;
+    this->shared_params = meta_params;
     return true;
 }
 
@@ -474,35 +472,18 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
 
                 // Track weight sums for each component
                 member_weight_sums[j] += this->responsibility_matrix[i][j] * obs_weights[i];
-                //member_weight_sums[j] += this->responsibility_matrix[i][j];
                 for (int k = 0; k < obs[i].size(); ++k){
                     mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
                         log2(obs[i][k]) + log2(obs_weights[i]));
-                    //mean_sums[j][k] += this->responsibility_matrix[i][j] * obs[i][k];
-                    //mean_sums[j][k] += this->responsibility_matrix[i][j] * obs[i][k] * obs_weights[i];
                 }
             }
         }
-        
-        /* 
-        for (int i = 0; i < n_sites; ++i){
-            for (int j = 0; j < n_components; ++j){
-                if (j > 0){
-                    fprintf(stdout, "\t");
-                }
-                fprintf(stdout, "%f", this->responsibility_matrix[i][j]);
-            }
-            fprintf(stdout, "\n");
-        }
-        exit(0);
-        */
 
         // M-step: update parameters
         
         for (int j = 0; j < n_components; ++j){
             if (weights[j] > 0){
                 // Distribution weight
-                //double new_weight = member_weight_sums[j] / (double)n_sites;
                 // This is already normalized by including the (normalized) observation weights
                 // in the sum
                 double new_weight = member_weight_sums[j] / obs_weight_scale;
@@ -521,20 +502,9 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                         double mean = mean_sums[j][k] / member_weight_sums[j];
                         double var = 0.0;
                         for (int i = 0; i < obs.size(); ++i){
-                            //var += this->responsibility_matrix[i][j] * pow(obs[i][k] - mean, 2);
-                            //var += pow(log2(this->responsibility_matrix[i][j]) + 
-                            //    2*log2(obs[i][k] - mean) + 
-                            //    log2(obs_weights[i]), 2);
-                            
                             double varlog = log2(this->responsibility_matrix[i][j]) + 
                                 2*log2(abs(obs[i][k] - mean)) + log2(obs_weights[i]);
                             var += pow(2, varlog);
-                            
-                            //var += this->responsibility_matrix[i][j] * pow(obs[i][k] - mean, 2) * obs_weights[i];
-                            
-                            //var += pow(2, log2(this->responsibility_matrix[i][j]) + 
-                            //    2*log2(obs[i][k] - mean) + 
-                            //    log2(obs_weights[i]));
                         }
                         var /= weights[j];
                         var /= obs_weight_scale;
@@ -567,27 +537,13 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             } 
         }
         
-        // Now that we have updated weights and parameters,
-        // handle all shared parameters - let whatever external
-        // function is set reconcile the parameters of the distrinbutions
-        // in the group. 
-        for (int group = 0; group < this->shared_params_groups.size(); ++group){
-
-            vector<mixtureDist*> dists_in_group;
-            vector<double> dists_in_group_weights;
-            double weightsum = 0.0;
-            for (set<int>::iterator i = this->shared_params_groups[group].begin(); 
-                i != this->shared_params_groups[group].end(); ++i){    
-                
-                dists_in_group.push_back(&this->dists[*i]);
-                dists_in_group_weights.push_back(this->weights[*i]);
-                weightsum += this->weights[*i];
+        // Let external functions hook into the update process
+        if (this->has_callback_fun){
+            vector<mixtureDist*> distvec;
+            for (int i = 0; i < this->dists.size(); ++i){
+                distvec.push_back(&this->dists[i]);
             }
-            for (int i = 0; i < dists_in_group_weights.size(); ++i){
-                dists_in_group_weights[i] /= weightsum;
-            }
-            this->shared_params_callbacks[group](dists_in_group, 
-                dists_in_group_weights, this->shared_params[group]);
+            this->callback_fun(distvec, this->weights, this->shared_params);
         }
         
         for (int j = 0; j < this->weights.size(); ++j){
@@ -672,6 +628,16 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     // Compute BIC and AIC
     this->compute_bic(obs.size() * obs[0].size());    
     return loglik_prev;
+}
+
+void mixtureModel::trigger_callback(){
+    if (this->has_callback_fun){
+        vector<mixtureDist*> distvec;
+        for (int i = 0; i < this->dists.size(); ++i){
+            distvec.push_back(&this->dists[i]);
+        }
+        this->callback_fun(distvec, this->weights, this->shared_params);
+    }
 }
 
 double mixtureModel::compute_loglik(const vector<vector<double> >& obs){
@@ -796,29 +762,6 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     for (int j = 0; j < vars.size(); ++j){
         vars[j] /= obs_weight_scale;
     }
-
-    /*
-    // Transform into columns & use Welford's algorithm to get mean & variance in one pass
-    vector<vector<float> > cols;
-    for (int k = 0; k < obs[0].size(); ++k){
-        vector<float> col;
-        cols.push_back(col);
-    }
-
-    for (int i = 0; i < obs.size(); ++i){
-        for (int k = 0; k < obs[i].size(); ++k){
-            cols[k].push_back(obs[i][k]);    
-        }
-    }
-    
-    vector<double> means;
-    vector<double> vars;
-    for (int k = 0; k < cols.size(); ++k){
-        pair<double, double> mu_var = welford(cols[k]);
-        means.push_back(mu_var.first);
-        vars.push_back(mu_var.second);
-    }
-    */
 
     // Fit the model (only one distribution)
     this->dists[0].update( means, vars );

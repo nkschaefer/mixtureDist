@@ -30,7 +30,7 @@
 
 typedef std::function< void( const std::vector<mixtureDist*>&,
     const std::vector<double>&,
-    std::vector<double>& ) > shared_params_callback;
+    std::vector<double>& ) > callback;
 
 class mixtureModel{
     public:
@@ -53,7 +53,7 @@ class mixtureModel{
         
         // Are there any global parameters that these shared distributions depend on? 
         // Store initial guesses in here and return to/update them in the callback function
-        std::vector<std::vector<double> > shared_params;
+        std::vector<double> shared_params;
 
         // Shortcuts for when using only one distribution type
         // Single-parameter distribution
@@ -71,10 +71,10 @@ class mixtureModel{
         void set_maxits(int maxits);
         void set_verbosity(short level);
         
-        // Set certain component distributions to share parameters
-        bool set_shared_params(std::vector<int> shared_param_dists, shared_params_callback fun);
-        bool set_shared_params(std::vector<int> shared_param_dists, shared_params_callback fun,
-            std::vector<double> shared_meta_params);
+        // Allow users to hook into update after the M step with an external function
+        bool set_callback(callback fun);
+        bool set_callback(callback fun, std::vector<double> shared_meta_params);
+        void trigger_callback();
 
         // Overloaded function to fit data passed in different ways
         double fit(const std::vector<std::vector<double> >& obs);
@@ -103,10 +103,11 @@ class mixtureModel{
         // done by allowing each of these to update their parameters, 
         // and then computing a weighted average of each parameter, using
         // the distribution weights.
-        std::vector<std::set<int> > shared_params_groups; 
         // What function should be called (externally) to reconcile distributions that share
         // parameters, after each maximization step?
-        std::vector<shared_params_callback> shared_params_callbacks;
+        callback callback_fun;
+        bool has_callback_fun;
+        
         // Set up a new mixture model
         void init(std::vector<mixtureDist>& dists, std::vector<double>& weights);
 
