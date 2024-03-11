@@ -53,17 +53,20 @@ void mixtureModel::init_responsibility_matrix(int n_obs){
     this->n_obs = n_obs;
 
     // Store the weight of each (component, observation) combination
+    //this->responsibility_matrix = (double*)malloc(sizeof(double[n_obs][n_components]));
+    
     this->responsibility_matrix = new double*[this->n_obs];
     for (int i = 0; i < this->n_obs; ++i){
         this->responsibility_matrix[i] = new double[this->n_components];
     }
-
+    
 }
 
 void mixtureModel::free_responsibility_matrix(){
     if (this->n_obs != -1){
         for (int i = 0; i < this->n_obs; ++i){
-            delete this->responsibility_matrix[i];
+            delete[] this->responsibility_matrix[i];
+            this->responsibility_matrix[i] = NULL;
         }
         delete[] this->responsibility_matrix;
         this->responsibility_matrix = NULL;
@@ -383,10 +386,10 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     double loglik_prev = 0.0;
 
     // Keep track of the mean of each dimension of each observation under each component dist
-    double** mean_sums = new double*[n_components];
     double member_weight_sums[n_components];
+    double** mean_sums = new double*[n_components];
     for (int j = 0; j < n_components; ++j){
-        mean_sums[j] = new double[obs[0].size()];
+        mean_sums[j] = new double[obs[0].size()]; 
     }
     
     // How small can the variance be before the component is zeroed out? 
@@ -658,10 +661,11 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     }
     
     for (int j = 0; j < n_components; ++j){
-        delete mean_sums[j];
+        delete[] mean_sums[j];
+        mean_sums[j] = NULL;
     }
     delete[] mean_sums;
-    
+
     // Store log likelihood of fit model
     this->loglik = loglik_prev;
     
