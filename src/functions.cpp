@@ -345,12 +345,28 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
     double xsum = 1;
     double term2 = 0;
     double term3 = 0;
+    double psum = 0.0;
     for (int i = 0; i < x.size(); ++i){
+        if (p[i] <= 0 || p[i] >= 1){
+            fprintf(stderr, "ERROR: dlmultinom: p[%d] out of range\n", i);
+            for (int j = 0; j < x.size(); ++j){
+                fprintf(stderr, "p[%d] = %f\n", j, p[j]);
+            }
+            exit(1);
+        }
+        psum += p[i];
         xsum += x[i];
         term2 += lgammaf(x[i] + 1);
         term3 += x[i] * log(p[i]);
     }
     double term1 = lgammaf(xsum);
+    if (isinf(term1) || isnan(term1) || isinf(term2) || isnan(term2) || isinf(term3) || isnan(term3)){
+        fprintf(stderr, "term1 %f term2 %f term3 %f\n", term1, term2, term3);
+        for (int i = 0; i < x.size(); ++i){
+            fprintf(stderr, "%d) x = %f p = %f\n", i, x[i], p[i]);
+        }
+        exit(1);
+    }
     return (term1 - term2 + term3)/log(2);
 }
 

@@ -539,11 +539,14 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         
         // Let external functions hook into the update process
         if (this->has_callback_fun){
+            this->callback_fun(*this, this->shared_params);
+            /*
             vector<mixtureDist*> distvec;
             for (int i = 0; i < this->dists.size(); ++i){
                 distvec.push_back(&this->dists[i]);
             }
             this->callback_fun(distvec, this->weights, this->shared_params);
+            */
         }
         
         for (int j = 0; j < this->weights.size(); ++j){
@@ -632,11 +635,14 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
 
 void mixtureModel::trigger_callback(){
     if (this->has_callback_fun){
+        this->callback_fun(*this, this->shared_params);
+        /*
         vector<mixtureDist*> distvec;
         for (int i = 0; i < this->dists.size(); ++i){
             distvec.push_back(&this->dists[i]);
         }
         this->callback_fun(distvec, this->weights, this->shared_params);
+        */
     }
 }
 

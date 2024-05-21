@@ -14,7 +14,7 @@ lib/libmixturedist.so: build/mixtureModel.o build/mixtureDist.o build/functions.
 lib/libmixturedist.a: build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o
 	ar rcs lib/libmixturedist.a build/mixtureModel.o build/mixtureDist.o build/functions.o build/cdflib.o build/incbeta.o 
 
-build/mixtureModel.o: src/mixtureModel.cpp src/mixtureDist.h build/mixtureDist.o
+build/mixtureModel.o: src/mixtureModel.cpp src/mixtureModel.h src/mixtureDist.h build/mixtureDist.o
 	$(COMP) $(FLAGS) $(IFLAGS) -c src/mixtureModel.cpp -o build/mixtureModel.o
 
 build/mixtureDist.o: src/mixtureDist.cpp src/functions.h build/functions.o

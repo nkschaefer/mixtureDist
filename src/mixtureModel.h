@@ -28,9 +28,14 @@
 // parameters they might depend on. It is up to that program to decide what to do and
 // how, or if, to adjust each distribution's parameters.
 
-typedef std::function< void( const std::vector<mixtureDist*>&,
-    const std::vector<double>&,
+class mixtureModel;
+
+typedef std::function< void( mixtureModel&,
     std::vector<double>& ) > callback;
+
+//typedef std::function< void( const std::vector<mixtureDist*>&,
+//    const std::vector<double>&,
+//    std::vector<double>& ) > callback;
 
 class mixtureModel{
     public:
