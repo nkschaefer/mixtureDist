@@ -31,6 +31,7 @@ typedef std::function< double( const std::vector<double>&,
 // method of moments, given a vector of means and variances (1+ dimensions)
 typedef std::function< bool( const std::vector<double>&, 
     const std::vector<double>&, 
+    const std::map<std::pair<int, int>, double>&,
     int,
     int, 
     std::vector<double>&,
@@ -51,6 +52,9 @@ class mixtureDist{
        
         // Lock all parameters associated with this distribution
         bool frozen;
+        
+        // Needs to know about covariance between inputs?
+        bool needs_cov;
 
         // Allow any or all parameters of this distribution to be frozen 
         // (will not update to fit data)
@@ -99,7 +103,8 @@ class mixtureDist{
         // Get log likelihood of one observation (or multiple, if multivariate or compound distribution)
         double loglik( const std::vector<double>& );
         // Given summaries of the data, update parameters of the distribution using MoM
-        bool update( const std::vector<double>& means, const std::vector<double>& vars);
+        bool update( const std::vector<double>& means, const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs);
 
         // Visualize data in distribution
         void print();
@@ -109,7 +114,8 @@ class mixtureDist{
         int get_n_parameters();
 
         // Create a new distribution, mapped to its name
-        static void register_dist(std::string name, int n_inputs, int n_params, loglik_func ll, update_func u);
+        static void register_dist(std::string name, int n_inputs, int n_params, bool nc,
+            loglik_func ll, update_func u);
         
         // If using a flexible distribution (such as multinomial), which can handle a non-fixed
         // number of inputs, tell the distribution here how many inputs to expect. 
@@ -141,6 +147,7 @@ class mixtureDist{
         // These will be accessed using the register_dist() static class method.
         static std::map<std::string, int> registered_n_inputs;
         static std::map<std::string, int> registered_n_params;
+        static std::map<std::string, bool> registered_needs_cov;
         static std::map<std::string, loglik_func> registered_ll_func;
         static std::map<std::string, update_func> registered_update_func;
         static void auto_register();
@@ -154,6 +161,7 @@ class mixtureDist{
             const std::vector<double>& params );
         static bool update_poisson( const std::vector<double>& means, 
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,
@@ -163,8 +171,9 @@ class mixtureDist{
             int start_idx,
             int n_inputs, 
             const std::vector<double>& params );
-        static bool update_gamma( const std::vector<double>& means, 
+        static bool update_gamma( const std::vector<double>& means,
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,
@@ -176,6 +185,7 @@ class mixtureDist{
             const std::vector<double>& params );
         static bool update_beta( const std::vector<double>& means, 
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,
@@ -187,6 +197,7 @@ class mixtureDist{
             const std::vector<double>& params );
         static bool update_gauss( const std::vector<double>& means, 
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,
@@ -198,6 +209,7 @@ class mixtureDist{
             const std::vector<double>& vars);
         static bool update_binom( const std::vector<double>& means,
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,
@@ -209,6 +221,19 @@ class mixtureDist{
             const std::vector<double>& vars);
         static bool update_multinom( const std::vector<double>& means,
             const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
+            int start_idx,
+            int n_inputs,
+            std::vector<double>& params,
+            const std::vector<bool>& params_frozen,
+            const bool all_frozen );
+        static double ll_2dgauss( const std::vector<double>& input,
+            int start_idx,
+            int n_inputs,
+            const std::vector<double>& vars);
+        static bool update_2dgauss( const std::vector<double>& means,
+            const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
             int start_idx,
             int n_inputs,
             std::vector<double>& params,

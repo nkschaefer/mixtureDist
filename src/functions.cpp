@@ -417,8 +417,13 @@ double dhyper(int N, int K, int n, int k){
  */
 double dnorm(double x, double mu, double sigma){
     double a = (x - mu) / sigma;
-    return (-0.5*pow(a,2)) / log(2) - log2(sigma) - 
+    double ret = (-0.5*pow(a,2)) / log(2) - log2(sigma) - 
         log2(sqrt(2*3.14159265358979));
+    if (isinf(ret) || isnan(ret)){
+        fprintf(stderr, "ERROR: dnorm: %f %f %f\n", x, mu, sigma);
+        exit(1);
+    }
+    return ret;
 }
 
 /**

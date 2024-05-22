@@ -472,9 +472,11 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
 
                 // Track weight sums for each component
                 member_weight_sums[j] += this->responsibility_matrix[i][j] * obs_weights[i];
+                
                 for (int k = 0; k < obs[i].size(); ++k){
-                    mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
-                        log2(obs[i][k]) + log2(obs_weights[i]));
+                    //mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
+                    //    log2(obs[i][k]) + log2(obs_weights[i]));
+                    mean_sums[j][k] += this->responsibility_matrix[i][j] * obs[i][k] * obs_weights[i];
                 }
             }
         }
@@ -498,16 +500,68 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                     // Compute summary statistics (mean and variance of each dimension of observations)
                     vector<double> means;
                     vector<double> vars;
+                    map<pair<int, int>, double> covs;
+                                        
                     for (int k = 0; k < obs[0].size(); ++k){
                         double mean = mean_sums[j][k] / member_weight_sums[j];
+                        
+                        if (dists[j].needs_cov){
+                            // We must compute covariances with other observations
+                            for (int l = k + 1; l < obs[0].size(); ++l){
+                                pair<int, int> key = make_pair(k, l);
+                                covs.insert(make_pair(key, 0.0));
+                            }
+                        }
+
                         double var = 0.0;
                         for (int i = 0; i < obs.size(); ++i){
-                            double varlog = log2(this->responsibility_matrix[i][j]) + 
-                                2*log2(abs(obs[i][k] - mean)) + log2(obs_weights[i]);
-                            var += pow(2, varlog);
+                            
+                            // If observation equals mean, this will contribute nothing
+                            // to variance and cause a NaN inside the logarithm
+                            if (obs[i][k] != mean && this->responsibility_matrix[i][j] != 0 &&
+                                obs_weights[i] != 0){
+                                double varlog = log2(this->responsibility_matrix[i][j]) + 
+                                    2*log2(abs(obs[i][k] - mean)) + log2(obs_weights[i]);
+                                var += pow(2, varlog);
+                            }
+
+                            if (dists[j].needs_cov){
+                                for (int l = k + 1; l < obs[0].size(); ++l){
+                                    pair<int, int> key = make_pair(k, l);
+                                    double meanl = mean_sums[j][l] / member_weight_sums[j];
+                                    if (obs[i][k] != mean && obs[i][l] != meanl && 
+                                        this->responsibility_matrix[i][j] != 0 && 
+                                        obs_weights[i] != 0){
+                                        // Can't take logarithm since we might have negative numbers
+                                        // here (not squaring)
+                                        double covar = this->responsibility_matrix[i][j] * 
+                                            (obs[i][k] - mean)*(obs[i][l] - meanl) * obs_weights[i];
+                                        covs[key] += covar;
+                                    }
+                                }
+                            }
+
                         }
                         var /= weights[j];
                         var /= obs_weight_scale;
+                        
+                        if (dists[j].needs_cov){
+                            for (map<pair<int, int>, double>::iterator c = covs.begin(); 
+                                c != covs.end(); ++c){
+                                c->second /= weights[j];
+                                c->second /= obs_weight_scale;
+                            }
+                        }
+
+                        if (isnan(mean) || isinf(mean)){
+                            fprintf(stderr, "mean %f %f\n", mean_sums[j][k], member_weight_sums[j]);
+                            fprintf(stderr, "%f\n", weights[j]);
+                            exit(1);
+                        }
+                        if (isnan(var) || isinf(var)){
+                            fprintf(stderr, "var %f %f %f\n", var, weights[j], obs_weight_scale);
+                            exit(1);
+                        }
                         means.push_back(mean);
                         vars.push_back(var);
                         if (var <= 1e-8){
@@ -517,7 +571,7 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                     
                     if (can_update){
                         // Allow distribution to update using method of moments
-                        can_update = this->dists[j].update( means, vars );
+                        can_update = this->dists[j].update( means, vars, covs );
                         if (!can_update){
                             // Created illegal parameter values. Eliminate this
                             // distribution.
@@ -735,7 +789,8 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     
     vector<double> means;
     vector<double> vars;
-    
+    map<pair<int, int>, double> covs;
+
     double obs_weight_sum = 0.0;
     for (int i = 0; i < obs_weights.size(); ++i){
         obs_weight_sum += obs_weights[i];
@@ -748,6 +803,12 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     for (int j = 0; j < obs[0].size(); ++j){
         means.push_back(0.0);
         vars.push_back(0.0);
+        if (dists[0].needs_cov){
+            for (int k = j + 1; k < obs[0].size(); ++k){
+                pair<int, int> key;
+                covs.insert(make_pair(key, 0.0));
+            }
+        }
     }
     double denom = (double)obs.size();
     for (int i = 0; i < obs.size(); ++i){
@@ -763,14 +824,24 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     for (int i = 0; i < obs.size(); ++i){
         for (int j = 0; j < obs[i].size(); ++j){
             vars[j] += pow(obs[i][j] - means[j], 2) * obs_weights[i];
+            if (dists[0].needs_cov){
+                for (int k = j + 1; k < obs[i].size(); ++k){
+                    pair<int, int> key = make_pair(j, k);
+                    covs[key] += (obs[i][j] - means[j])*(obs[i][k] - means[k]) * obs_weights[i];
+                }
+            }
         }
     }
+
     for (int j = 0; j < vars.size(); ++j){
         vars[j] /= obs_weight_scale;
     }
+    for (map<pair<int, int>, double>::iterator cov = covs.begin(); cov != covs.end(); ++cov){
+        cov->second /= obs_weight_scale;
+    }
 
     // Fit the model (only one distribution)
-    this->dists[0].update( means, vars );
+    this->dists[0].update( means, vars, covs );
     
     this->weights.clear();
     this->weights.push_back(1.0);

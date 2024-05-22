@@ -35,6 +35,7 @@ double mixtureDist::ll_poisson(const vector<double>& input,
 }
 bool mixtureDist::update_poisson(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
@@ -56,6 +57,7 @@ double mixtureDist::ll_gamma(const vector<double>& input,
 }
 bool mixtureDist::update_gamma(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
@@ -87,6 +89,7 @@ double mixtureDist::ll_beta(const vector<double>& input,
 }
 bool mixtureDist::update_beta(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
@@ -122,12 +125,13 @@ double mixtureDist::ll_gauss(const vector<double>& input,
 
 bool mixtureDist::update_gauss(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
     const vector<bool>& params_frozen,
     const bool all_frozen){
-
+    
     if (vars[start_idx] == 0){
         // Normal distribution with zero variance is illegal
         return false;
@@ -151,6 +155,7 @@ double mixtureDist::ll_binom(const vector<double>& input,
 
 bool mixtureDist::update_binom(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
@@ -197,6 +202,7 @@ double mixtureDist::ll_multinom(const vector<double>& input,
 
 bool mixtureDist::update_multinom(const vector<double>& means,
     const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
     int start_idx,
     int n_inputs,
     vector<double>& params,
@@ -228,15 +234,71 @@ bool mixtureDist::update_multinom(const vector<double>& means,
     return all_valid;
 }
 
+double mixtureDist::ll_2dgauss(const vector<double>& input, 
+    int start_idx,
+    int n_inputs, 
+    const vector<double>& params){
+    
+    // params: mean1 mean2 sd1 sd2 corr
+
+    double rho = params[4];
+    double rho2 = rho*rho;
+
+    double term1 = - log2(2.0*M_PI) - log2(params[2]) - log2(params[3]) - 
+        0.5*log2(1.0 - rho2);
+    
+    double term2 = -1.0/(2*(1.0 - rho2));
+    
+    double x_mds = (input[start_idx + 0] - params[0])/params[2];
+    double y_mds = (input[start_idx + 1] - params[1])/params[3];
+    
+    double inside_brackets = (x_mds*x_mds - 2*rho*x_mds*y_mds + y_mds*y_mds);
+    double inside_exp = term2*inside_brackets;
+    
+    inside_exp /= log(2);
+    return term1 + inside_exp;
+}
+
+bool mixtureDist::update_2dgauss(const vector<double>& means,
+    const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
+    int start_idx,
+    int n_inputs,
+    vector<double>& params,
+    const vector<bool>& params_frozen,
+    const bool all_frozen){
+    
+    // params: mean1 mean2 sd1 sd2 corr
+
+    if (all_frozen){
+        return true;
+    }
+    
+    params[0] = means[start_idx + 0];
+    params[1] = means[start_idx + 1];
+    params[2] = sqrt(vars[start_idx + 0]);
+    params[3] = sqrt(vars[start_idx + 1]);
+    pair<int, int> key = make_pair(start_idx + 0, start_idx + 1);
+    double cov = covs.at(key);
+    params[4] = cov/(params[2]*params[3]);
+    
+    if (params[2] <= 0 || params[3] <= 0){
+        return false;
+    }
+    return true;
+}
+
 std::map<std::string, int> mixtureDist::registered_n_inputs;
 std::map<std::string, int> mixtureDist::registered_n_params;
 std::map<std::string, loglik_func> mixtureDist::registered_ll_func;
 std::map<std::string, update_func> mixtureDist::registered_update_func;
+std::map<std::string, bool> mixtureDist::registered_needs_cov;
 
 // Register all preset distributions with class
-void mixtureDist::register_dist(string name, int n_inputs, int n_params, loglik_func llf, update_func uf){
+void mixtureDist::register_dist(string name, int n_inputs, int n_params, bool nc, loglik_func llf, update_func uf){
     mixtureDist::registered_n_inputs.insert(make_pair(name, n_inputs));
     mixtureDist::registered_n_params.insert(make_pair(name, n_params));
+    mixtureDist::registered_needs_cov.insert(make_pair(name, nc));
     mixtureDist::registered_ll_func.insert(make_pair(name, llf));
     mixtureDist::registered_update_func.insert(make_pair(name, uf));
 }
@@ -246,31 +308,35 @@ void mixtureDist::register_dist(string name, int n_inputs, int n_params, loglik_
  */
 void mixtureDist::auto_register(){
     if (mixtureDist::registered_n_inputs.count("poisson") == 0){    
-        mixtureDist::register_dist("poisson", 1, 1, mixtureDist::ll_poisson, mixtureDist::update_poisson);
+        mixtureDist::register_dist("poisson", 1, 1, false, mixtureDist::ll_poisson, mixtureDist::update_poisson);
     }
     if (mixtureDist::registered_n_inputs.count("gamma") == 0){
-        mixtureDist::register_dist("gamma", 1, 2, mixtureDist::ll_gamma, mixtureDist::update_gamma);
+        mixtureDist::register_dist("gamma", 1, 2, false, mixtureDist::ll_gamma, mixtureDist::update_gamma);
     }
     if (mixtureDist::registered_n_inputs.count("beta") == 0){
-        mixtureDist::register_dist("beta", 1, 2, mixtureDist::ll_beta, mixtureDist::update_beta);
+        mixtureDist::register_dist("beta", 1, 2, false, mixtureDist::ll_beta, mixtureDist::update_beta);
     }
     if (mixtureDist::registered_n_inputs.count("gauss") == 0){
-        mixtureDist::register_dist("gauss", 1, 2, mixtureDist::ll_gauss, mixtureDist::update_gauss);
+        mixtureDist::register_dist("gauss", 1, 2, false, mixtureDist::ll_gauss, mixtureDist::update_gauss);
     }
     if (mixtureDist::registered_n_inputs.count("normal") == 0){
-        mixtureDist::register_dist("normal", 1, 2, mixtureDist::ll_gauss, mixtureDist::update_gauss);
+        mixtureDist::register_dist("normal", 1, 2, false, mixtureDist::ll_gauss, mixtureDist::update_gauss);
     }
     if (mixtureDist::registered_n_inputs.count("binomial") == 0){
-        mixtureDist::register_dist("binomial", 2, 1, mixtureDist::ll_binom, mixtureDist::update_binom);
+        mixtureDist::register_dist("binomial", 2, 1, false, mixtureDist::ll_binom, mixtureDist::update_binom);
     }
     if (mixtureDist::registered_n_inputs.count("multinomial") == 0){
-        mixtureDist::register_dist("multinomial", -1, -1, mixtureDist::ll_multinom, mixtureDist::update_multinom);
+        mixtureDist::register_dist("multinomial", -1, -1, false, mixtureDist::ll_multinom, mixtureDist::update_multinom);
+    }
+    if (mixtureDist::registered_n_inputs.count("2dgauss") == 0){
+        mixtureDist::register_dist("2dgauss", 2, 5, true, mixtureDist::ll_2dgauss, mixtureDist::update_2dgauss);
     }
 }
 
 mixtureDist::mixtureDist(){
     this->n_components = 0;
     this->frozen = false;
+    this->needs_cov = false;
     this->name = "";
     mixtureDist::auto_register();
 }
@@ -295,6 +361,7 @@ mixtureDist::mixtureDist(const mixtureDist& m){
     this->n_components = m.n_components;
     this->frozen = m.frozen;
     this->name = m.name;
+    this->needs_cov = m.needs_cov;
 
     for (int i = 0; i < m.n_components; ++i){
         this->names.push_back(m.names[i]);
@@ -342,6 +409,7 @@ bool mixtureDist::add_dist(string name,
         this->n_inputs.push_back(mixtureDist::registered_n_inputs[name]);
         this->names.push_back(name);
         this->n_params.push_back(mixtureDist::registered_n_params[name]);
+        this->needs_cov = mixtureDist::registered_needs_cov[name];
         // Check that correct number of parameters was input
         if (mixtureDist::registered_n_params[name] == -1){
             // warn user to set the number of inputs (flexible distribution)?
@@ -578,7 +646,9 @@ to tell it how many values to take in.\n");
     return ll;
 }
 
-bool mixtureDist::update( const vector<double>& means, const vector<double>& vars ){
+bool mixtureDist::update( const vector<double>& means, const vector<double>& vars, 
+    const map<pair<int, int>, double>& covs){
+    
     bool success = true;
     int start_idx = 0;
     for (int i = 0; i < this->n_components; ++i){
@@ -588,7 +658,7 @@ If using a distribution with a flexible number of inputs, you must call set_num_
 to tell it how many values to take in.\n");
             exit(1);
         }
-        success = success & this->update_funcs[i]( means, vars, start_idx, this->n_inputs[i],
+        success = success & this->update_funcs[i]( means, vars, covs, start_idx, this->n_inputs[i],
             this->params[i], this->params_frozen[i], this->frozen );
         start_idx += this->n_inputs[i];  
     }
