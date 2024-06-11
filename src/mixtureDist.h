@@ -107,8 +107,8 @@ class mixtureDist{
             const std::map<std::pair<int, int>, double>& covs);
 
         // Visualize data in distribution
-        void print();
-        void print(int indentation_level);
+        void print() const;
+        void print(int indentation_level) const;
         
         // How many parameters do all component distributions of this combined have?
         int get_n_parameters();
@@ -153,7 +153,7 @@ class mixtureDist{
         static void auto_register();
 
         static void print_unregistered(std::string name);
-        void print_one(std::string& indent_str, int idx, bool print_weight);
+        void print_one(std::string& indent_str, int idx, bool print_weight) const;
 
         static double ll_poisson( const std::vector<double>& input, 
             int start_idx, 
@@ -227,11 +227,35 @@ class mixtureDist{
             std::vector<double>& params,
             const std::vector<bool>& params_frozen,
             const bool all_frozen );
+        static double ll_negbin( const std::vector<double>& input,
+            int start_idx,
+            int n_inputs,
+            const std::vector<double>& vars);
+        static bool update_negbin( const std::vector<double>& means,
+            const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
+            int start_idx,
+            int n_inputs,
+            std::vector<double>& params,
+            const std::vector<bool>& params_frozen,
+            const bool all_frozen );
         static double ll_2dgauss( const std::vector<double>& input,
             int start_idx,
             int n_inputs,
             const std::vector<double>& vars);
         static bool update_2dgauss( const std::vector<double>& means,
+            const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
+            int start_idx,
+            int n_inputs,
+            std::vector<double>& params,
+            const std::vector<bool>& params_frozen,
+            const bool all_frozen );
+        static double ll_exp( const std::vector<double>& input,
+            int start_idx,
+            int n_inputs,
+            const std::vector<double>& vars);
+        static bool update_exp( const std::vector<double>& means,
             const std::vector<double>& vars,
             const std::map<std::pair<int, int>, double>& covs,
             int start_idx,

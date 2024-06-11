@@ -56,6 +56,9 @@ class mixtureModel{
         // Copy constructor
         mixtureModel(const mixtureModel& m);
         
+        // Set up a new mixture model
+        void init(std::vector<mixtureDist>& dists, std::vector<double>& weights);
+        
         // Are there any global parameters that these shared distributions depend on? 
         // Store initial guesses in here and return to/update them in the callback function
         std::vector<double> shared_params;
@@ -94,7 +97,7 @@ class mixtureModel{
         double fit(const std::vector<int>& obs);
         double fit(const std::vector<int>& obs, std::vector<double>& obs_weights);
 
-        void print();
+        void print() const;
     
     private:
         bool print_lls;
@@ -112,9 +115,6 @@ class mixtureModel{
         // parameters, after each maximization step?
         callback callback_fun;
         bool has_callback_fun;
-        
-        // Set up a new mixture model
-        void init(std::vector<mixtureDist>& dists, std::vector<double>& weights);
 
         // Allocate responsibility matrix for a data set
         void init_responsibility_matrix(int nobs);

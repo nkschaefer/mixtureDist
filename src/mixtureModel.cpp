@@ -119,6 +119,7 @@ mixtureModel::mixtureModel(const mixtureModel& m){
     }
     this->print_lls = false;
     this->print_dists = false;
+    
 }
 
 mixtureModel::mixtureModel(vector<mixtureDist>& dists, vector<double> weights){
@@ -854,7 +855,7 @@ with dummy parameters. This is necessary to judge how many parameters are being 
 }
 
 
-void mixtureModel::print(){
+void mixtureModel::print() const{
     fprintf(stderr, "=== Mixture model with %d components ===\n", this->n_components);
     bool needs_newline = false;
     if (this->loglik != 0){
@@ -868,8 +869,8 @@ void mixtureModel::print(){
     if (needs_newline){
         fprintf(stderr, "\n");
     }
-    fprintf(stderr, "log2 likelihood = %.3f BIC %.3f AIC %.3f\n", this->loglik,
-        this->bic, this->aic);
+    //fprintf(stderr, "log2 likelihood = %.3f BIC %.3f AIC %.3f\n", this->loglik,
+    //    this->bic, this->aic);
     for (int i = 0; i < this->n_components; ++i){
         fprintf(stderr, "   Component weight: %.3f\n", this->weights[i]);
         this->dists[i].print(2);

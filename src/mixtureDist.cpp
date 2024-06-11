@@ -288,6 +288,63 @@ bool mixtureDist::update_2dgauss(const vector<double>& means,
     return true;
 }
 
+double mixtureDist::ll_negbin(const vector<double>& input, 
+    int start_idx,
+    int n_inputs, 
+    const vector<double>& params){
+    
+    // params: mu phi
+    return dnbinom(input[start_idx], params[0], params[1]);
+}
+
+bool mixtureDist::update_negbin(const vector<double>& means,
+    const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
+    int start_idx,
+    int n_inputs,
+    vector<double>& params,
+    const vector<bool>& params_frozen,
+    const bool all_frozen){
+    
+    if (all_frozen){
+        return true;
+    }
+    if (means[start_idx] == 0 || vars[start_idx] == 0.0){
+        return false;
+    } 
+    pair<double, double> mu_phi = nbinom_moments(means[start_idx], vars[start_idx]);
+    params[0] = mu_phi.first;
+    params[1] = mu_phi.second;
+    return true;
+}
+
+double mixtureDist::ll_exp(const vector<double>& input, 
+    int start_idx,
+    int n_inputs, 
+    const vector<double>& params){
+    
+    return dexp(input[start_idx], params[0]);
+}
+
+bool mixtureDist::update_exp(const vector<double>& means,
+    const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
+    int start_idx,
+    int n_inputs,
+    vector<double>& params,
+    const vector<bool>& params_frozen,
+    const bool all_frozen){
+    
+    if (all_frozen){
+        return true;
+    }
+    if (means[start_idx] == 0){
+        return false;
+    }
+    params[0] = 1.0 / means[start_idx];
+    return true;
+}
+
 std::map<std::string, int> mixtureDist::registered_n_inputs;
 std::map<std::string, int> mixtureDist::registered_n_params;
 std::map<std::string, loglik_func> mixtureDist::registered_ll_func;
@@ -325,11 +382,23 @@ void mixtureDist::auto_register(){
     if (mixtureDist::registered_n_inputs.count("binomial") == 0){
         mixtureDist::register_dist("binomial", 2, 1, false, mixtureDist::ll_binom, mixtureDist::update_binom);
     }
+    if (mixtureDist::registered_n_inputs.count("negative_binomial") == 0){
+        mixtureDist::register_dist("negative_binomial", 1, 2, false, mixtureDist::ll_negbin, mixtureDist::update_negbin);
+    }
+    if (mixtureDist::registered_n_inputs.count("negbinom") == 0){
+        mixtureDist::register_dist("negbinom", 1, 2, false, mixtureDist::ll_negbin, mixtureDist::update_negbin);
+    }
+    if (mixtureDist::registered_n_inputs.count("negbin") == 0){
+        mixtureDist::register_dist("negbin", 1, 2, false, mixtureDist::ll_negbin, mixtureDist::update_negbin);
+    }
     if (mixtureDist::registered_n_inputs.count("multinomial") == 0){
         mixtureDist::register_dist("multinomial", -1, -1, false, mixtureDist::ll_multinom, mixtureDist::update_multinom);
     }
     if (mixtureDist::registered_n_inputs.count("2dgauss") == 0){
         mixtureDist::register_dist("2dgauss", 2, 5, true, mixtureDist::ll_2dgauss, mixtureDist::update_2dgauss);
+    }
+    if (mixtureDist::registered_n_inputs.count("exponential") == 0){
+        mixtureDist::register_dist("exponential", 1, 1, false, mixtureDist::ll_exp, mixtureDist::update_exp);
     }
 }
 
@@ -665,7 +734,7 @@ to tell it how many values to take in.\n");
     return success;
 } 
 
-void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight){
+void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight) const{
     string indent_str2 = indent_str + "   ";
     if (this->n_components <= 1 && this->name != ""){
         indent_str += this->name + ": ";
@@ -692,7 +761,7 @@ void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight){
     fprintf(stderr, " ]\n");
 }
 
-void mixtureDist::print(int indentation_level){
+void mixtureDist::print(int indentation_level) const{
     string indent_str = "";
     for (int i = 0; i < indentation_level; ++i){
         indent_str += "   ";
@@ -706,8 +775,13 @@ void mixtureDist::print(int indentation_level){
         if (this->frozen){
             frzstr = "frozen ";
         }
-        fprintf(stderr, "%s%s%sDist with %d components:\n", frzstr.c_str(), 
+        fprintf(stderr, "%s%s%sDist with %d component", frzstr.c_str(), 
             indent_str.c_str(), namestr.c_str(), this->n_components);
+        if (this->n_components > 1){
+            fprintf(stderr, "s");
+        }
+        fprintf(stderr, ":\n");
+
         indent_str += "   ";
         // Don't print weights if they're identical
         double weight1 = this->weights[0];
@@ -727,7 +801,7 @@ void mixtureDist::print(int indentation_level){
     }
 }
 
-void mixtureDist::print(){
+void mixtureDist::print() const{
     this->print(0); 
 }
 

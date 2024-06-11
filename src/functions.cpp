@@ -283,6 +283,10 @@ pair<double, double> beta_moments(double mean, double var){
  * p = mean/variance = phi/(mu+phi)
  * r = phi
  *
+ * Wikipedia definition:
+ * p = mean/variance
+ * r = (mean*p)/(1-p)
+ *
  */
 double dnbinom(int x, int mu, double phi){
     double term1 = binom_coef_log(x + phi - 1, x);
@@ -305,6 +309,10 @@ double pnbinom(int x, int mu, double phi){
  * Fit negative binomial distribution using method of moments
  */
 pair<int, double> nbinom_moments(double mean, double var){
+    if (var < mean){
+        // Problem
+        var = mean + 1.0;
+    }
     int mu = (int)round(mean);
     double phi = pow((double)mean, 2) / (var - mean);
     return make_pair(mu, phi);
