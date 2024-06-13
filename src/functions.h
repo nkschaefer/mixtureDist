@@ -26,6 +26,7 @@ long double betaf(double a, double b);
 std::pair<double, double> welford(std::vector<double>& vals);
 std::pair<double, double> welford_weights(std::vector<double>& vals,
     std::vector<double>& weights, bool freq_weights);
+double percentile(std::vector<double>& vec, double perc);
 
 // ===== PROBABILITY DISTRIBUTIONS =====
 

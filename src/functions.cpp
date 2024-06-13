@@ -145,6 +145,26 @@ pair<double, double> welford_weights(vector<double>& vals,
     return make_pair(mean, var);
 }
 
+/**
+ * Function to return the value from a vector at the given percentile of the
+ * empirical distribution.
+ */
+double percentile(vector<double>& vec, double quant){
+    sort(vec.begin(), vec.end());
+    double tot = 0.0;
+    for (int i = 0; i < vec.size(); ++i){
+        tot += vec[i];
+    }
+    double runtot = 0.0;
+    for (int i = 0; i < vec.size(); ++i){
+        runtot += vec[i];
+        if (runtot >= tot*quant){
+            return vec[i];
+        }
+    }
+    return vec[vec.size()-1];
+}
+
 // ===== Probability distributions and related functions =====
 
 /**
