@@ -165,6 +165,60 @@ double percentile(vector<double>& vec, double quant){
     return vec[vec.size()-1];
 }
 
+/**
+ * Finds the point of intersection between two gaussians.
+ * Returns two possible solutions
+ */
+pair<double, double> int2gauss(double mu1, double mu2, double sigma1, double sigma2){
+    if (mu2 < mu1){
+        // Flip.
+        double tmp = mu2;
+        double tmp2 = sigma2;
+        mu2 = mu1;
+        sigma2 = sigma1;
+        mu1 = tmp;
+        sigma1 = tmp2;
+    }
+    double sig21 = sigma1*sigma1;
+    double sig22 = sigma2*sigma2;
+    double mu21 = mu1*mu1;
+    double mu22 = mu2*mu2;
+    
+    double a = (-1.0/sig21 + 1.0/sig22)/2;
+    double b = -mu2/sig22 + mu1/sig21;
+    double c = (mu22/sig22 - mu21/sig21 + log(sig22/sig21))/2;
+    
+    // Solve ax^2 + bx + c
+    double sol1 = (-b + sqrt(b*b - 4*a*c))/(2*a);
+    double sol2 = (-b - sqrt(b*b - 4*a*c))/(2*a);
+    return make_pair(sol1, sol2);
+}
+
+/**
+ * Determine the percent of overlap between two Gaussians
+ */
+double ov2gauss(double mu1, double mu2, double sigma1, double sigma2){
+    
+    if (mu2 < mu1){
+        // Flip
+        double tmp1 = mu1;
+        mu1 = mu2;
+        mu2 = tmp1;
+        double tmp2 = sigma1;
+        sigma1 = sigma2;
+        sigma2 = tmp2;
+    }
+    pair<double, double> intpts = int2gauss(mu1, mu2, sigma1, sigma2);
+    double ov1 = (1.0 - pnorm(intpts.first, mu1, sigma1) + pnorm(intpts.first, mu2, sigma2));
+    double ov2 = (1.0 - pnorm(intpts.second, mu1, sigma1) + pnorm(intpts.second, mu2, sigma2));
+    if (ov1 >= 1.0 || ov1 <= 0.0){
+        return ov2;
+    }
+    else{
+        return ov1;
+    }
+}
+
 // ===== Probability distributions and related functions =====
 
 /**

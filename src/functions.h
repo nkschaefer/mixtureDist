@@ -27,6 +27,8 @@ std::pair<double, double> welford(std::vector<double>& vals);
 std::pair<double, double> welford_weights(std::vector<double>& vals,
     std::vector<double>& weights, bool freq_weights);
 double percentile(std::vector<double>& vec, double perc);
+std::pair<double, double> int2gauss(double mu1, double mu2, double s1, double s2);
+double ov2gauss(double mu1, double mu2, double s1, double s2);
 
 // ===== PROBABILITY DISTRIBUTIONS =====
 
