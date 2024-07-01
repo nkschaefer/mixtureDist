@@ -219,6 +219,46 @@ double ov2gauss(double mu1, double mu2, double sigma1, double sigma2){
     }
 }
 
+/**
+ * Determine whether a distribution is bimodal, according to Searle's bimodality
+ * test
+ */
+bool bimod_test(vector<double>& data){
+    // First, get mean and variance
+    pair<double, double> mu_var = welford(data);
+    
+    double n = (double)data.size();
+
+    double sigma = sqrt(mu_var.second);
+
+    // Now get skewness and kurtosis
+    double skew = 0.0;
+    double kurt = 0.0;
+    
+    double frac = 1.0/(n-1.0);
+
+    for (int i = 0; i < data.size(); ++i){
+        double diff = (data[i] - mu_var.first)/sigma;
+        double diff3 = pow(diff, 3);
+        double diff4 = diff3*diff;
+        skew += frac*diff3;
+        kurt += frac*diff4;
+    }
+
+    // Transform kurtosis to excess kurtosis
+    kurt -= 3.0;
+    
+    double scale = (3*(n-1.0)*(n-1.0))/((n-2.0)*(n-3.0));
+
+    double bimod_coef = (skew*skew + 1.0)/(kurt + scale);
+    if (bimod_coef > 5.0/9.0){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
 // ===== Probability distributions and related functions =====
 
 /**

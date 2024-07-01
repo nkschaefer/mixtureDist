@@ -29,7 +29,7 @@ std::pair<double, double> welford_weights(std::vector<double>& vals,
 double percentile(std::vector<double>& vec, double perc);
 std::pair<double, double> int2gauss(double mu1, double mu2, double s1, double s2);
 double ov2gauss(double mu1, double mu2, double s1, double s2);
-
+bool bimod_test(std::vector<double>& vals);
 // ===== PROBABILITY DISTRIBUTIONS =====
 
 double dpois(double x, double l);
