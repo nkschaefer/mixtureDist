@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <utility>
 #include <math.h>
+#include <float.h>
 #include "functions.h"
 #include "incbeta/incbeta.h"
 #include "cdflib/cdflib.h"
@@ -343,6 +344,13 @@ double dexp(float x, float l){
 }
 
 /**
+ * CDF of exponential distribution at x with mean l
+ */
+double pexp(double x, double l){
+    return 1.0 - exp(-l*x);
+}
+
+/**
  * Log2 PDF of beta-binomial distribution
  * x = number successes
  * n = number trials
@@ -436,6 +444,12 @@ pair<int, double> nbinom_moments(double mean, double var){
  * Log2 binomial PDF of k successes in n trials with success probability p
  */
 double dbinom(double n, double k, double p){
+    if (p <= 0){
+        p = DBL_MIN;
+    }
+    else if (p >= 1){
+        p = 1.0-DBL_MIN;
+    }
     double nchoosek = binom_coef_log(n, k);
     double res =  nchoosek + k*log2(p) + (n-k)*log2(1-p);
     return res;
@@ -469,6 +483,14 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
     double term3 = 0;
     double psum = 0.0;
     for (int i = 0; i < x.size(); ++i){
+        double this_p = p[i];
+        if (this_p <= 0){
+            this_p = DBL_MIN;
+        }
+        else if (this_p >= 1){
+            this_p = 1.0 - DBL_MIN;
+        }
+        /*
         if (p[i] <= 0 || p[i] >= 1){
             fprintf(stderr, "ERROR: dlmultinom: p[%d] out of range\n", i);
             for (int j = 0; j < x.size(); ++j){
@@ -476,10 +498,11 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
             }
             exit(1);
         }
-        psum += p[i];
+        */
+        psum += this_p;
         xsum += x[i];
         term2 += lgammaf(x[i] + 1);
-        term3 += x[i] * log(p[i]);
+        term3 += x[i] * log(this_p);
     }
     double term1 = lgammaf(xsum);
     if (isinf(term1) || isnan(term1) || isinf(term2) || isnan(term2) || isinf(term3) || isnan(term3)){

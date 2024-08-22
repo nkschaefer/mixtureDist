@@ -38,6 +38,7 @@ double dgamma(double x, double a, double b);
 double pgamma(double x, double a, double b);
 std::pair<double, double> gamma_moments(double mu, double var);
 double dexp(float x, float l);
+double pexp(double x, double l);
 double dbetabin(double x, double n, double a, double b);
 double dbeta(double x, double a, double b);
 double pbeta(double x, double a, double b);
