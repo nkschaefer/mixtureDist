@@ -445,10 +445,10 @@ pair<int, double> nbinom_moments(double mean, double var){
  */
 double dbinom(double n, double k, double p){
     if (p <= 0){
-        p = DBL_MIN;
+        p = DBL_MIN*1e6;
     }
     else if (p >= 1){
-        p = 1.0-DBL_MIN;
+        p = 1.0-DBL_MIN*1e6;
     }
     double nchoosek = binom_coef_log(n, k);
     double res =  nchoosek + k*log2(p) + (n-k)*log2(1-p);
@@ -485,10 +485,10 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
     for (int i = 0; i < x.size(); ++i){
         double this_p = p[i];
         if (this_p <= 0){
-            this_p = DBL_MIN;
+            this_p = DBL_MIN*1e6;
         }
         else if (this_p >= 1){
-            this_p = 1.0 - DBL_MIN;
+            this_p = 1.0 - DBL_MIN*1e6;
         }
         /*
         if (p[i] <= 0 || p[i] >= 1){
