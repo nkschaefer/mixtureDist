@@ -91,6 +91,14 @@ long double betaf(double a, double b){
 }
 
 /**
+ * Digamma function (NOTE: base e, not base 2)
+ */
+double digamma(double x){
+    double xcpy = x;
+    return psi(&x);
+}
+
+/**
  * Welford's algorithm for computing mean and variance in a single pass
  * Returns pair of (mean, variance)
  */
