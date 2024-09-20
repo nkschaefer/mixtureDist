@@ -512,7 +512,7 @@ All files in the repository with the exception of subdirectories of src
 and are under the MIT license (below). For other licenses, keep reading, 
 or check the LICENSE file in the relevant directory.
 ==========
-Copyright 2023 Regents of the University of California
+Copyright 2023-2024 Nathan Schaefer
 
 Permission is hereby granted, free of charge, to any person obtaining a copy 
 of this software and associated documentation files (the “Software”), to deal 
