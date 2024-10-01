@@ -78,7 +78,8 @@ double factorial(int n){
  * Valid for all real numbers
  */
 double lbetaf(double a, double b){
-    return ((lgammaf(a) + lgammaf(b)) - lgammaf(a + b))/M_LN2;
+    int intptr;
+    return ((lgammaf_r(a, &intptr) + lgammaf_r(b, &intptr)) - lgammaf_r(a + b, &intptr))/M_LN2;
 }
 
 /**
@@ -298,7 +299,8 @@ double ppois(double x, double l){
  */
 double dgamma(double x, double a, double b){
     double term1 = a * log2(b);
-    double term2 = lgammaf(a) / log(2);
+    int intptr;
+    double term2 = lgammaf_r(a, &intptr) / log(2);
     double term3 = (a - 1.0) * log2(x);
     double term4 = (-b * x) * log2(exp(1));
     return (term1-term2) + term3 + term4;
@@ -509,7 +511,8 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
         */
         psum += this_p;
         xsum += x[i];
-        term2 += lgammaf(x[i] + 1);
+        int intptr;
+        term2 += lgammaf_r(x[i] + 1, &intptr);
         term3 += x[i] * log(this_p);
     }
     double term1 = lgammaf(xsum);
@@ -543,10 +546,11 @@ double ddirichlet(const vector<double>& x, const vector<double>& alpha){
         return log(0);
     }
     double betaprod = 0.0;
-    double betadenom = lgammaf(alpha_0);
+    int intptr;
+    double betadenom = lgammaf_r(alpha_0, &intptr);
     double term2 = 0.0;
     for (int i = 0; i < alpha.size(); ++i){
-        betaprod += lgammaf(alpha[i]);
+        betaprod += lgammaf_r(alpha[i], &intptr);
         term2 += (alpha[i]-1) * log(x[i]);
     }
     double beta = betaprod - betadenom;

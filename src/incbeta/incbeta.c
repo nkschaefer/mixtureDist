@@ -38,7 +38,8 @@ double incbeta(double a, double b, double x) {
     }
 
     /*Find the first part before the continued fraction.*/
-    const double lbeta_ab = lgamma(a)+lgamma(b)-lgamma(a+b);
+    int intptr;
+    const double lbeta_ab = lgamma_r(a, &intptr)+lgamma_r(b, &intptr)-lgamma_r(a+b, &intptr);
     const double front = exp(log(x)*a+log(1.0-x)*b-lbeta_ab) / a;
 
     /*Use Lentz's algorithm to evaluate the continued fraction.*/
