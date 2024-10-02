@@ -30,7 +30,7 @@ build/cdflib.o: src/cdflib/cdflib.c src/cdflib/cdflib.h
 	$(CCOMP) -fPIC -c src/cdflib/cdflib.c -o build/cdflib.o
 
 build/incbeta.o: src/incbeta/incbeta.c src/incbeta/incbeta.h
-	$(CCOMP) -Wall -Wshadow -O2 -fPIC -g -c src/incbeta/incbeta.c -o build/incbeta.o
+	$(CCOMP) -Wall -Wshadow -O2 -fPIC -D_REENTRANT -c src/incbeta/incbeta.c -o build/incbeta.o
 
 clean:
 	rm build/*.o
