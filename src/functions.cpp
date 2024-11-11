@@ -485,7 +485,7 @@ double pbinom(int n, int k, double p){
  */
 double dmultinom(const vector<double>& x, const vector<double>& p){
     if (x.size() != p.size()){
-        fprintf(stderr, "ERROR: dlmultinom: length of x != length of p\n");
+        fprintf(stderr, "ERROR: dmultinom: length of x != length of p\n");
         exit(1);
     }
     double xsum = 1;
@@ -502,7 +502,7 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
         }
         /*
         if (p[i] <= 0 || p[i] >= 1){
-            fprintf(stderr, "ERROR: dlmultinom: p[%d] out of range\n", i);
+            fprintf(stderr, "ERROR: dmultinom: p[%d] out of range\n", i);
             for (int j = 0; j < x.size(); ++j){
                 fprintf(stderr, "p[%d] = %f\n", j, p[j]);
             }
@@ -531,30 +531,59 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
  */
 double ddirichlet(const vector<double>& x, const vector<double>& alpha){
     if (x.size() != alpha.size()){
-        fprintf(stderr, "ERROR: dldirichlet: length of x != length of alpha\n");
+        fprintf(stderr, "ERROR: ddirichlet: length of x != length of alpha\n");
         exit(1);
-    }
-    double alpha_0 = 0.0;
-    double xsum = 0.0;
-    for (int i = 0; i < alpha.size(); ++i){
-        alpha_0 += alpha[i];
-        xsum += x[i];
-    }
-    if (xsum != 1.0){
-        fprintf(stderr, "ERROR: dldirichlet: x vector does not sum to 1 (%f)\n", xsum);
-        //exit(1);
-        return log(0);
     }
     double betaprod = 0.0;
     int intptr;
-    double betadenom = lgammaf_r(alpha_0, &intptr);
     double term2 = 0.0;
+    double alpha_0 = 0.0;
+    double xsum = 0.0;
     for (int i = 0; i < alpha.size(); ++i){
         betaprod += lgammaf_r(alpha[i], &intptr);
+        alpha_0 += alpha[i];
+        xsum += x[i];
         term2 += (alpha[i]-1) * log(x[i]);
     }
+    if (xsum != 1.0){
+        fprintf(stderr, "ERROR: ddirichlet: x vector does not sum to 1 (%f)\n", xsum);
+        exit(1);
+    }
+    double betadenom = lgammaf_r(alpha_0, &intptr);
     double beta = betaprod - betadenom;
     return (term2 - beta)/log(2);
+}
+
+/**
+ * Log2 Dirichlet-multinomial PDF
+ *
+ * Takes a vector of double as input, and a vector of double
+ * of corresponding length as parameters
+ */
+double ddirichletmultinom(const vector<double>& x, const vector<double>& alpha){
+    if (x.size() != alpha.size()){
+        fprintf(stderr, "ERROR: ddirichletmultinom: length of x != length of alpha\n");
+        exit(1);
+    }
+    
+    double sum = 0.0;
+    double xtot = 0.0;
+    double a_0 = 0.0;
+    int intptr;
+    for (int i = 0; i < x.size(); ++i){
+        double term1 = lgammaf_r(x[i] + alpha[i], &intptr);
+        double term2 = lgammaf_r(alpha[i], &intptr);
+        double term3 = lgammaf_r(x[i] + 1, &intptr);
+        sum += term1 - term2 - term3;
+        xtot += x[i];
+        a_0 += alpha[i];
+    } 
+
+    double term1a = lgammaf_r(a_0, &intptr);
+    double term2a = lgammaf_r(xtot+1, &intptr);
+    double term3a = lgammaf_r(xtot+a_0, &intptr);
+    sum += term1a + term2a - term3a;
+    return sum/log(2);
 }
 
 /** 

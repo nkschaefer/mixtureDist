@@ -51,6 +51,7 @@ double dbinom(double n, double k, double p);
 double pbinom(int n, int k, double p);
 double dmultinom(const std::vector<double>& x, const std::vector<double>& p);
 double ddirichlet(const std::vector<double>& x, const std::vector<double>& alpha);
+double ddirichletmultinom(const std::vector<double>& x, const std::vector<double>& alpha);
 double dhyper(int N, int K, int n, int k);
 double dnorm(double x, double mu, double sigma);
 double pnorm(double x, double mu, double sigma);
