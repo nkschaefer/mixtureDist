@@ -269,6 +269,58 @@ bool bimod_test(vector<double>& data){
     }
 }
 
+// ===== Random value generating functions =====
+
+/**
+ * Generate a random sample from a negative binomial distribution
+ */
+double rnbinom(double mu, double phi){
+    
+    if (mu <= 0 || phi <= 0){
+        return -1;
+    }
+    while(true){
+        double rn = (double)rand() / RAND_MAX;
+        
+        // Use inverse CDF of Negative Binomial
+        
+        // First convert mu/phi parameterization to r/p
+        double r = phi;
+        double p = phi/(mu+phi);
+        
+        // Treat as inv CDF
+        int which = 2;
+        // CDF value
+        double P = rn;
+        // 1 - CDF value
+        double Q = 1.0-rn;
+        // What they call S wikipedia calls r
+        // What they call PR wikipedia calls p
+        // This will contain 1-p.
+        double OMPR = 1-p;
+        double result;
+        int status;
+        double bound;
+        
+        cdfnbn(&which, &P, &Q, &result, &r, &p, &OMPR, &status, &bound); 
+        if (status != 0){
+            //return -1; 
+        }
+        else{
+            return result;    
+        }
+    }
+}
+
+/**
+ * Generate a random sample from an exponential distribution
+ */
+double rexp(double lambda){
+    double r = (double)rand() / RAND_MAX;
+    return (-log(1.0 - r)/lambda);
+
+}
+
 // ===== Probability distributions and related functions =====
 
 /**
@@ -545,10 +597,10 @@ double ddirichlet(const vector<double>& x, const vector<double>& alpha){
         xsum += x[i];
         term2 += (alpha[i]-1) * log(x[i]);
     }
-    if (xsum != 1.0){
-        fprintf(stderr, "ERROR: ddirichlet: x vector does not sum to 1 (%f)\n", xsum);
-        exit(1);
-    }
+    //if (xsum != 1.0){
+    //    fprintf(stderr, "ERROR: ddirichlet: x vector does not sum to 1 (%f)\n", xsum);
+    //    exit(1);
+    //}
     double betadenom = lgammaf_r(alpha_0, &intptr);
     double beta = betaprod - betadenom;
     return (term2 - beta)/log(2);
