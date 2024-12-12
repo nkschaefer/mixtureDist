@@ -311,7 +311,7 @@ bool mixtureDist::update_negbin(const vector<double>& means,
     }
     if (means[start_idx] == 0 || vars[start_idx] == 0.0){
         return false;
-    } 
+    }
     pair<double, double> mu_phi = nbinom_moments(means[start_idx], vars[start_idx]);
     params[0] = mu_phi.first;
     params[1] = mu_phi.second;

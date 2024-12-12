@@ -277,7 +277,9 @@ bool bimod_test(vector<double>& data){
 double rnbinom(double mu, double phi){
     
     if (mu <= 0 || phi <= 0){
-        return -1;
+        fprintf(stderr, "ERROR: invalid params for rnbinom (%f %f)\n", mu, phi);
+        exit(1);
+
     }
     while(true){
         double rn = (double)rand() / RAND_MAX;
@@ -316,6 +318,10 @@ double rnbinom(double mu, double phi){
  * Generate a random sample from an exponential distribution
  */
 double rexp(double lambda){
+    if (lambda <= 0){
+        fprintf(stderr, "ERROR: invalid lambda for rexp\n");
+        exit(1);
+    }
     double r = (double)rand() / RAND_MAX;
     return (-log(1.0 - r)/lambda);
 
@@ -472,7 +478,7 @@ pair<double, double> beta_moments(double mean, double var){
  * r = (mean*p)/(1-p)
  *
  */
-double dnbinom(int x, int mu, double phi){
+double dnbinom(double x, double mu, double phi){
     double term1 = binom_coef_log(x + phi - 1, x);
     double term2 = x * (log2(mu) - log2(mu + phi));
     double term3 = phi * (log2(phi) - log2(mu + phi));
@@ -483,7 +489,7 @@ double dnbinom(int x, int mu, double phi){
  * Negative binomial CDF 
  * uses mu/phi parameterization
  */
-double pnbinom(int x, int mu, double phi){
+double pnbinom(double x, double mu, double phi){
     double p = phi/((double)mu+phi);
     // incbeta syntax is a, b, x for I_x(a, b)
     return incbeta(phi, x+1, p); 
@@ -492,12 +498,13 @@ double pnbinom(int x, int mu, double phi){
 /**
  * Fit negative binomial distribution using method of moments
  */
-pair<int, double> nbinom_moments(double mean, double var){
-    if (var < mean){
+pair<double, double> nbinom_moments(double mean, double var){
+    if (var <= mean){
         // Problem
         var = mean + 1.0;
     }
-    int mu = (int)round(mean);
+    //int mu = (int)round(mean);
+    double mu = mean;
     double phi = pow((double)mean, 2) / (var - mean);
     return make_pair(mu, phi);
 }
