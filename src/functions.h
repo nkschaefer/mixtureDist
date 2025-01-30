@@ -35,6 +35,7 @@ bool bimod_test(std::vector<double>& vals);
 // ===== RANDOM SAMPLE FUNCTIONS =====
 double rnbinom(double mu, double phi);
 double rexp(double lambda);
+void rdirichlet(std::vector<double>& params, std::vector<double>& results);
 
 // ===== PROBABILITY DISTRIBUTIONS =====
 

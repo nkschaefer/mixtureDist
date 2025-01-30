@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <utility>
 #include <math.h>
+#include <random>
 #include <float.h>
 #include "functions.h"
 #include "incbeta/incbeta.h"
@@ -325,6 +326,26 @@ double rexp(double lambda){
     double r = (double)rand() / RAND_MAX;
     return (-log(1.0 - r)/lambda);
 
+}
+
+/**
+ * Generate a random sample from a Dirichlet distribution
+ */
+void rdirichlet(vector<double>& params, vector<double>& results){
+    default_random_engine generator(time(NULL));
+    // Sample a Gamma variable for each alpha, then set proportion to each alpha / alpha_sum
+    vector<double> rands;
+    double randsum = 0.0;
+    for (int i = 0; i < params.size(); ++i){
+        gamma_distribution<double> dist(params[i], 1.0);
+        double samp = dist(generator);
+        randsum += samp;
+        rands.push_back(samp);
+    }
+    results.clear();
+    for (int i = 0; i < params.size(); ++i){
+        results.push_back(rands[i]/randsum);
+    }
 }
 
 // ===== Probability distributions and related functions =====
