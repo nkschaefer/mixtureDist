@@ -78,7 +78,8 @@ class mixtureModel{
         void set_delta_thresh(float delta_thresh);
         void set_maxits(int maxits);
         void set_verbosity(short level);
-        
+        void freeze_dists();
+
         // Allow users to hook into update after the M step with an external function
         bool set_callback(callback fun);
         bool set_callback(callback fun, std::vector<double> shared_meta_params);
@@ -102,6 +103,7 @@ class mixtureModel{
     private:
         bool print_lls;
         bool print_dists;
+        bool e_only;
 
         float delta_thresh;
         int maxits;

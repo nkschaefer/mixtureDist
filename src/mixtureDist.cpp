@@ -149,7 +149,7 @@ double mixtureDist::ll_binom(const vector<double>& input,
     int start_idx,
     int n_inputs, 
     const vector<double>& params){
-    // input 1 is n (successes), input 2 is k (total)
+    // input 1 is k (successes), input 2 is n (total) 
     return dbinom(input[start_idx+1], input[start_idx], params[0]); 
 }
 

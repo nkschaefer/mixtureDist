@@ -43,6 +43,7 @@ void mixtureModel::init(vector<mixtureDist>& dists_init,
     this->print_dists = false;
     
     this->has_callback_fun = false;
+    this->e_only = false;
 }
 
 void mixtureModel::init_responsibility_matrix(int n_obs){
@@ -88,6 +89,7 @@ mixtureModel::mixtureModel(){
     this->print_lls = false;
     this->print_dists = false;
     this->has_callback_fun = false;
+    this->e_only = false;
 }
 
 mixtureModel::mixtureModel(const mixtureModel& m){
@@ -119,7 +121,7 @@ mixtureModel::mixtureModel(const mixtureModel& m){
     }
     this->print_lls = false;
     this->print_dists = false;
-    
+    this->e_only = m.e_only;
 }
 
 mixtureModel::mixtureModel(vector<mixtureDist>& dists, vector<double> weights){
@@ -237,6 +239,10 @@ void mixtureModel::set_verbosity(short level){
         fprintf(stderr, "ERROR: invalid verbosity level %d\n", level);
         exit(1);
     }
+}
+
+void mixtureModel::freeze_dists(){
+    this->e_only = true;
 }
 
 bool mixtureModel::set_callback(callback callback_func){
@@ -367,6 +373,9 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             break;
         }
     } 
+    if (e_only){
+        all_frozen = true;
+    }
 
     // Need to create "responsibility matrix," storing the likelihoods of 
     // observations under each distribution multiplied by distribution weight
@@ -495,7 +504,7 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                 }
                 this->weights[j] = new_weight;
             
-                if (new_weight > 0){
+                if (!e_only && new_weight > 0){
                     bool can_update = true;
 
                     // Compute summary statistics (mean and variance of each dimension of observations)
