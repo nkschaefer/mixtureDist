@@ -94,6 +94,7 @@ mixtureModel::mixtureModel(){
 
 mixtureModel::mixtureModel(const mixtureModel& m){
     this->n_components = m.n_components;
+    //this->free_responsibility_matrix();
     this->responsibility_matrix = NULL;
     this->n_obs = -1;
     if (m.n_obs != -1 && m.responsibility_matrix != NULL){
@@ -358,23 +359,22 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         fprintf(stderr, "ERROR: cannot fit mixture model on 0 sites\n");
         exit(1);
     }
-
-    // How many component distributions?
-    int n_components = this->n_components;
-    if (n_components <= 1){
-        return this->fit_single(obs, obs_weights);
-    }
     
     // Is every component distribution frozen -- i.e. no need to update?
     bool all_frozen = true;
     for (int j = 0; j < this->n_components; ++j){
+        if (e_only){
+            this->dists[j].frozen = true;
+        }
         if (!this->dists[j].frozen){
             all_frozen = false;
             break;
         }
-    } 
-    if (e_only){
-        all_frozen = true;
+    }
+    
+    // How many component distributions?
+    if (n_components <= 1){
+        return this->fit_single(obs, obs_weights);
     }
 
     // Need to create "responsibility matrix," storing the likelihoods of 
@@ -406,7 +406,8 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     // Has the model reached a point where it only contains one component?
     bool one_component = false;
     
-    // Make observation weights sum to 1
+    // Make observation weights sum to num observations (this will keep weights from throwing off
+    // BIC calculation)
     double obs_weight_sum = 0.0; 
     for (int i = 0; i < obs_weights.size(); ++i){
         obs_weight_sum += obs_weights[i];
@@ -416,7 +417,13 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     double obs_weight_scale = (double)obs_weights.size();
     for (int i = 0; i < obs_weights.size(); ++i){
         //obs_weights[i] /= obs_weight_sum;
-        obs_weights[i] = pow(2, log2(obs_weights[i]) - log2(obs_weight_sum) + log2(obs_weight_scale));
+        if (obs_weights[i] > 0){
+            obs_weights[i] = pow(2, log2(obs_weights[i]) - log2(obs_weight_sum) + log2(obs_weight_scale));
+            if (isnan(obs_weights[i])){
+                fprintf(stderr, "weight nan! %f %f %f\n", obs_weights[i], obs_weight_sum, obs_weight_scale);
+                exit(1);
+            }
+        }
     }
     
     while (delta > delta_thresh && its < max_its && !one_component){
@@ -431,6 +438,9 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             }
         }
         for (int i = 0; i < n_sites; ++i){
+            if (obs_weights[i] == 0.0){
+                continue;
+            }
             double rowsum = 0;
             // Prevent underflow by dividing densities by the smallest density encountered
             double llmax = 0;
@@ -482,7 +492,13 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
 
                 // Track weight sums for each component
                 member_weight_sums[j] += this->responsibility_matrix[i][j] * obs_weights[i];
-                
+                if (isnan(member_weight_sums[j])){
+                    fprintf(stderr, "mws nan %d) j\n", j);
+                    fprintf(stderr, "w %f rm %f rs %f\n", obs_weights[i], responsibility_matrix[i][j],
+                        rowsum);
+                    exit(1);
+                } 
+
                 for (int k = 0; k < obs[i].size(); ++k){
                     //mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
                     //    log2(obs[i][k]) + log2(obs_weights[i]));
@@ -620,7 +636,7 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             }
         }
         
-        double loglik = this->compute_loglik(obs); 
+        double loglik = this->compute_loglik(obs, obs_weights); 
         if (isinf(loglik)){
             fprintf(stderr, "LL inf\n");
             exit(1);
@@ -710,7 +726,7 @@ void mixtureModel::trigger_callback(){
     }
 }
 
-double mixtureModel::compute_loglik(const vector<vector<double> >& obs){
+double mixtureModel::compute_loglik(const vector<vector<double> >& obs, vector<double>& obs_weights){
     double loglik = 0;
 
     int n_components_pos = 0;
@@ -726,6 +742,9 @@ double mixtureModel::compute_loglik(const vector<vector<double> >& obs){
     bool one_component = n_components_pos == 1;
     
     for (int i = 0; i < obs.size(); ++i){
+        if (obs_weights[i] == 0.0){
+            continue;
+        }
         double ll_row[n_components];
         double ll_row_max = 0.0;
         for (int j = 0; j < n_components; ++j){
@@ -807,7 +826,9 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     }
     double obs_weight_scale = (double)obs_weights.size();
     for (int i = 0; i < obs_weights.size(); ++i){
-        obs_weights[i] = pow(2, log2(obs_weights[i]) - log2(obs_weight_sum) + log2(obs_weight_scale));
+        if (obs_weights[i] > 0.0){
+            obs_weights[i] = pow(2, log2(obs_weights[i]) - log2(obs_weight_sum) + log2(obs_weight_scale));
+        }
     }
 
     for (int j = 0; j < obs[0].size(); ++j){
@@ -822,6 +843,9 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     }
     double denom = (double)obs.size();
     for (int i = 0; i < obs.size(); ++i){
+        if (obs_weights[i] == 0.0){
+            continue;
+        }
         for (int j = 0; j < obs[i].size(); ++j){
             means[j] += obs_weights[i] * obs[i][j];
         }
@@ -832,6 +856,9 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     }
     
     for (int i = 0; i < obs.size(); ++i){
+        if (obs_weights[i] == 0.0){
+            continue;
+        }
         for (int j = 0; j < obs[i].size(); ++j){
             vars[j] += pow(obs[i][j] - means[j], 2) * obs_weights[i];
             if (dists[0].needs_cov){
@@ -857,8 +884,15 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     this->weights.push_back(1.0);
 
     // Compute the log likelihood of the model
-    double loglik = compute_loglik(obs);
+    double loglik = compute_loglik(obs, obs_weights);
     this->loglik = loglik;
+    if (loglik == 0.0){
+        fprintf(stderr, "LL == 0?\n");
+        for (int i = 0; i < obs_weights.size(); ++i){
+            fprintf(stderr, "w %d) %f\n", i, obs_weights[i]);
+        }
+        exit(1);
+    }
     this->compute_bic(obs.size() * obs[0].size());
     return loglik;
 }

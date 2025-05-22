@@ -740,7 +740,7 @@ void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight) const
         indent_str += this->name + ": ";
     }
     if (incl_weight){
-        fprintf(stderr, "%s%s distribution weight = %.3f\n", indent_str.c_str(),
+        fprintf(stderr, "%s%s distribution weight = %4.3e\n", indent_str.c_str(),
             this->names[idx].c_str(), this->weights[idx]);
     }
     else{
@@ -753,7 +753,7 @@ void mixtureDist::print_one(string& indent_str, int idx, bool incl_weight) const
         npar = this->n_inputs[idx];
     }
     for (int i = 0; i < npar; ++i){
-        fprintf(stderr, " %.3f", this->params[idx][i]);
+        fprintf(stderr, " %4.3e", this->params[idx][i]);
         if (this->params_frozen[idx][i]){
             fprintf(stderr, "*");
         }
@@ -766,19 +766,19 @@ void mixtureDist::print(int indentation_level) const{
     for (int i = 0; i < indentation_level; ++i){
         indent_str += "   ";
     }
-    if (this->n_components > 1){
+    if (true){
+    //if (this->n_components > 1){
         string namestr = "";
         if (this->name != ""){
             namestr = this->name + ": ";
         }
-        string frzstr = "";
-        if (this->frozen){
-            frzstr = "frozen ";
-        }
-        fprintf(stderr, "%s%s%sDist with %d component", frzstr.c_str(), 
-            indent_str.c_str(), namestr.c_str(), this->n_components);
+        fprintf(stderr, "%s%sDist with %d component", indent_str.c_str(), 
+            namestr.c_str(), this->n_components);
         if (this->n_components > 1){
             fprintf(stderr, "s");
+        }
+        if (this->frozen){
+            fprintf(stderr, " (*)");
         }
         fprintf(stderr, ":\n");
 

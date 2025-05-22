@@ -125,7 +125,8 @@ class mixtureModel{
         void free_responsibility_matrix();
         
         // Compute log likelihood of a data set under current model
-        double compute_loglik(const std::vector<std::vector<double> >& obs);
+        double compute_loglik(const std::vector<std::vector<double> >& obs,
+            std::vector<double>& obs_weights);
 
         // Run fitting for the case where there is only one distribution in the mixture model.
         double fit_single(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights);
