@@ -351,6 +351,14 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             obs.size(), obs_weights.size());
         exit(1);
     }
+    int ni = this->dists[0].get_n_inputs();
+    for (int i = 1; i < this->n_components; ++i){
+        if (this->dists[i].get_n_inputs() != ni){
+            fprintf(stderr, "ERROR: different number of inputs for component distributions:\n");
+            fprintf(stderr, "dist 0: %d vs dist %d: %d\n", ni, i, this->dists[i].get_n_inputs());
+            exit(1);
+        }
+    }
 
     // How many observations in data set?
     long int n_sites = obs.size();
@@ -359,7 +367,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         fprintf(stderr, "ERROR: cannot fit mixture model on 0 sites\n");
         exit(1);
     }
-    
     // Is every component distribution frozen -- i.e. no need to update?
     bool all_frozen = true;
     for (int j = 0; j < this->n_components; ++j){
@@ -376,7 +383,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     if (n_components <= 1){
         return this->fit_single(obs, obs_weights);
     }
-
     // Need to create "responsibility matrix," storing the likelihoods of 
     // observations under each distribution multiplied by distribution weight
     // and normalized so that rows sum to 1. We make this accessible to outside
@@ -425,11 +431,9 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             }
         }
     }
-    
     while (delta > delta_thresh && its < max_its && !one_component){
         
         // E - step: determine membership weights. 
-        
         // Keep track of means of each component of each observation
         for (int j = 0; j < n_components; ++j){
             member_weight_sums[j] = 0.0;
@@ -485,7 +489,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                 // Compute log likelihood for initial fit.
                 loglik_prev += log2(rowsum) + llmax;    
             }
-            
             for (int j = 0; j < n_components; ++j){
                 // Normalize responsibility matrix entries for this row
                 this->responsibility_matrix[i][j] /= rowsum;
@@ -508,7 +511,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         }
 
         // M-step: update parameters
-        
         for (int j = 0; j < n_components; ++j){
             if (weights[j] > 0){
                 // Distribution weight
@@ -616,7 +618,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                 }
             } 
         }
-        
         // Let external functions hook into the update process
         if (this->has_callback_fun){
             this->callback_fun(*this, this->shared_params);
@@ -635,13 +636,11 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
                 break;
             }
         }
-        
         double loglik = this->compute_loglik(obs, obs_weights); 
         if (isinf(loglik)){
             fprintf(stderr, "LL inf\n");
             exit(1);
         }
-
         if (this->print_lls){
             fprintf(stderr, "LL %.3f -> %.3f (Improvement: %.3f)\n", loglik_prev/log2(exp(1)), 
                 loglik/log2(exp(1)), (loglik-loglik_prev)/log2(exp(1)));
@@ -653,7 +652,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         }
 
         //delta = abs(loglik-loglik_prev);
-        
         if (all_frozen){
             delta = 0.0;
         }
@@ -685,7 +683,6 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             }
         }
     }
-    
     // Assign observations to likeliest component of origin.
     for (int i = 0; i < n_sites; ++i){
         double maxweight = 0;
@@ -698,19 +695,17 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         }
         this->assignments.push_back(max_component);
     }
-    
     for (int j = 0; j < n_components; ++j){
         delete[] mean_sums[j];
         mean_sums[j] = NULL;
     }
     delete[] mean_sums;
-
     // Store log likelihood of fit model
     this->loglik = loglik_prev;
-    
     // Compute BIC and AIC
     this->compute_bic(obs.size() * obs[0].size());    
     return loglik_prev;
+   
 }
 
 void mixtureModel::trigger_callback(){

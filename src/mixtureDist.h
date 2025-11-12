@@ -112,6 +112,9 @@ class mixtureDist{
         
         // How many parameters do all component distributions of this combined have?
         int get_n_parameters();
+        
+        // How many inputs do all component distributions of this combined have?
+        int get_n_inputs();
 
         // Create a new distribution, mapped to its name
         static void register_dist(std::string name, int n_inputs, int n_params, bool nc,

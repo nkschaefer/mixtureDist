@@ -814,6 +814,14 @@ int mixtureDist::get_n_parameters(){
     return nparam;
 }
 
+int mixtureDist::get_n_inputs(){
+    int ninput = 0;
+    for (int i = 0; i < this->n_components; ++i){
+        ninput += this->n_inputs[i];
+    }
+    return ninput;
+}
+
 void mixtureDist::set_num_inputs(int component_idx, int ni){
     if (component_idx > this->n_components-1){
         fprintf(stderr, "ERROR: cannot set number of inputs on component %d; \
