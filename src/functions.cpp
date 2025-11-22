@@ -595,7 +595,7 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
         term2 += lgammaf_r(x[i] + 1, &intptr);
         term3 += x[i] * log(this_p);
     }
-    double term1 = lgammaf(xsum);
+    double term1 = lgammaf_r(xsum, &intptr);
     if (isinf(term1) || isnan(term1) || isinf(term2) || isnan(term2) || isinf(term3) || isnan(term3)){
         fprintf(stderr, "term1 %f term2 %f term3 %f\n", term1, term2, term3);
         for (int i = 0; i < x.size(); ++i){
