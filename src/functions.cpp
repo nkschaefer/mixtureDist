@@ -572,6 +572,8 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
     double term2 = 0;
     double term3 = 0;
     double psum = 0.0;
+    
+    int intptr;
     for (int i = 0; i < x.size(); ++i){
         double this_p = p[i];
         if (this_p <= 0){
@@ -591,7 +593,6 @@ double dmultinom(const vector<double>& x, const vector<double>& p){
         */
         psum += this_p;
         xsum += x[i];
-        int intptr;
         term2 += lgammaf_r(x[i] + 1, &intptr);
         term3 += x[i] * log(this_p);
     }
