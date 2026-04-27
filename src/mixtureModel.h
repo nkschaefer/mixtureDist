@@ -79,11 +79,15 @@ class mixtureModel{
         void set_maxits(int maxits);
         void set_verbosity(short level);
         void freeze_dists();
+        
+        // Should the model use hard weight assignments? default = soft weights
+        void set_hard(bool h);
 
         // Allow users to hook into update after the M step with an external function
         bool set_callback(callback fun);
         bool set_callback(callback fun, std::vector<double> shared_meta_params);
         void trigger_callback();
+        void remove_callback();
 
         // Overloaded function to fit data passed in different ways
         double fit(const std::vector<std::vector<double> >& obs);
@@ -97,6 +101,15 @@ class mixtureModel{
 
         double fit(const std::vector<int>& obs);
         double fit(const std::vector<int>& obs, std::vector<double>& obs_weights);
+        
+        // Avoid maximization - just perform one E step
+        // This will fill the responsibility matrix with per-observation probabilities
+        void compute_probs(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights);
+        void compute_probs(const std::vector<std::vector<double> >& obs);
+
+        bool rm_component(int idx);
+        std::vector<int> rm_correlated_components(double cutoff=0.0);
+        double corr(int i, int j);
 
         void print() const;
     
@@ -109,6 +122,8 @@ class mixtureModel{
         int maxits;
         int n_obs; // store size of current data set
         
+        bool hard;
+
         // Allow component distributions to share parameters. This will be
         // done by allowing each of these to update their parameters, 
         // and then computing a weighted average of each parameter, using
@@ -124,6 +139,24 @@ class mixtureModel{
         // De-allocate responsibility matrix
         void free_responsibility_matrix();
         
+        double* member_weight_sums;
+        double** mean_sums;
+        long int n_sites;
+        double obs_weight_scale;
+        bool one_component;
+        
+        // Prepare data for fitting
+        void begin_fit(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights);
+        
+        // Free memory after fitting
+        void end_fit();
+        
+        // Internal use only - E-step in EM
+        void E_step(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights);
+        
+        // Internal use only - M-step in EM
+        double M_step(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights);
+
         // Compute log likelihood of a data set under current model
         double compute_loglik(const std::vector<std::vector<double> >& obs,
             std::vector<double>& obs_weights);

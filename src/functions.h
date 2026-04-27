@@ -24,6 +24,7 @@ double factorial(int n);
 double lbetaf(double a, double b);
 long double betaf(double a, double b);
 double digamma(double x);
+double trigamma(double x);
 std::pair<double, double> welford(std::vector<double>& vals);
 std::pair<double, double> welford_weights(std::vector<double>& vals,
     std::vector<double>& weights, bool freq_weights);

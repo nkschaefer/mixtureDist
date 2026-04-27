@@ -234,6 +234,33 @@ bool mixtureDist::update_multinom(const vector<double>& means,
     return all_valid;
 }
 
+double mixtureDist::ll_uniform(const vector<double>& input, 
+    int start_idx,
+    int n_inputs, 
+    const vector<double>& params){
+    
+    // params: sizes of input dimensions
+    double n_input_tot = params[0];
+    for (int i = 1; i < params.size(); ++i){
+        n_input_tot *= params[i];
+    }
+    
+    return -log2(n_input_tot);
+}
+
+bool mixtureDist::update_uniform(const vector<double>& means,
+    const vector<double>& vars,
+    const map<pair<int, int>, double>& covs,
+    int start_idx,
+    int n_inputs,
+    vector<double>& params,
+    const vector<bool>& params_frozen,
+    const bool all_frozen){
+    
+    // Don't update.
+    return true;
+}
+
 double mixtureDist::ll_2dgauss(const vector<double>& input, 
     int start_idx,
     int n_inputs, 
@@ -256,6 +283,7 @@ double mixtureDist::ll_2dgauss(const vector<double>& input,
     double inside_exp = term2*inside_brackets;
     
     inside_exp /= log(2);
+
     return term1 + inside_exp;
 }
 
@@ -281,7 +309,19 @@ bool mixtureDist::update_2dgauss(const vector<double>& means,
     pair<int, int> key = make_pair(start_idx + 0, start_idx + 1);
     double cov = covs.at(key);
     params[4] = cov/(params[2]*params[3]);
-    
+    if (params[4] > 1){
+        params[4] = 1 - 1e-4;
+    }
+    else if (params[4] < -1){
+        params[4] = -1 + 1e-4;
+    }
+    if (params[2] <= 0){
+        params[2] = 1e-4;
+    }
+    if (params[3] <= 0){
+        params[3] = 1e-4;
+    }
+
     if (params[2] <= 0 || params[3] <= 0){
         return false;
     }
@@ -393,6 +433,9 @@ void mixtureDist::auto_register(){
     }
     if (mixtureDist::registered_n_inputs.count("multinomial") == 0){
         mixtureDist::register_dist("multinomial", -1, -1, false, mixtureDist::ll_multinom, mixtureDist::update_multinom);
+    }
+    if (mixtureDist::registered_n_inputs.count("uniform") == 0){
+        mixtureDist::register_dist("uniform", -1, -1, false, mixtureDist::ll_uniform, mixtureDist::update_uniform);
     }
     if (mixtureDist::registered_n_inputs.count("2dgauss") == 0){
         mixtureDist::register_dist("2dgauss", 2, 5, true, mixtureDist::ll_2dgauss, mixtureDist::update_2dgauss);

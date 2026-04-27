@@ -44,6 +44,15 @@ void mixtureModel::init(vector<mixtureDist>& dists_init,
     
     this->has_callback_fun = false;
     this->e_only = false;
+    
+    this->hard = false;
+    
+    this->member_weight_sums = NULL;
+    this->mean_sums = NULL;
+    this->n_sites = 0;
+    this->obs_weight_scale = 0.0;
+    this->one_component = false;
+
 }
 
 void mixtureModel::init_responsibility_matrix(int n_obs){
@@ -90,6 +99,9 @@ mixtureModel::mixtureModel(){
     this->print_dists = false;
     this->has_callback_fun = false;
     this->e_only = false;
+    this->hard = false;
+    this->mean_sums = NULL;
+    this->member_weight_sums = NULL;
 }
 
 mixtureModel::mixtureModel(const mixtureModel& m){
@@ -123,6 +135,9 @@ mixtureModel::mixtureModel(const mixtureModel& m){
     this->print_lls = false;
     this->print_dists = false;
     this->e_only = m.e_only;
+    this->hard = m.hard;
+    this->mean_sums = NULL;
+    this->member_weight_sums = NULL;
 }
 
 mixtureModel::mixtureModel(vector<mixtureDist>& dists, vector<double> weights){
@@ -242,6 +257,10 @@ void mixtureModel::set_verbosity(short level){
     }
 }
 
+void mixtureModel::set_hard(bool h){
+    this->hard = h;
+}
+
 void mixtureModel::freeze_dists(){
     this->e_only = true;
 }
@@ -258,6 +277,11 @@ bool mixtureModel::set_callback(callback callback_func,
     this->callback_fun = callback_func;
     this->shared_params = meta_params;
     return true;
+}
+
+void mixtureModel::remove_callback(){
+    this->has_callback_fun = false;
+    this->shared_params.clear();
 }
 
 double mixtureModel::fit(const vector<double>& obs){
@@ -340,8 +364,246 @@ double mixtureModel::fit(const vector<vector<double> >& obs){
     return this->fit(obs, obs_weights);
 }
 
-double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs_weights){
+/**
+ * Should only be called internally
+ * no checks for proper initialization, etc.
+ */
+void mixtureModel::E_step(const vector<vector<double> >& obs, vector<double>& obs_weights){
     
+    // Keep track of means of each component of each observation
+    for (int j = 0; j < n_components; ++j){
+        member_weight_sums[j] = 0.0;
+        for (int k = 0; k < obs[0].size(); ++k){
+            mean_sums[j][k] = 0.0;
+        }
+    }
+    for (int i = 0; i < n_sites; ++i){
+        if (obs_weights[i] == 0.0){
+            continue;
+        }
+        double rowsum = 0;
+        // Prevent underflow by dividing densities by the smallest density encountered
+        double llmax = 0;
+        int maxcomp = -1;
+        double ll[n_components];
+        for (int j = 0; j < n_components; ++j){
+            if (this->weights[j] > 0.0){
+                ll[j] = log2(weights[j]) + this->dists[j].loglik(obs[i]);
+                if (isnan(ll[j]) || isinf(ll[j])){
+                    fprintf(stderr, "Invalid log likelihood returned by distribution!\n");
+                    fprintf(stderr, "weight %f\n", weights[j]);
+                    fprintf(stderr, "Input:\n");
+                    for (int k = 0; k < obs[i].size(); ++k){
+                        fprintf(stderr, "%f ", obs[i][k]);
+                    }
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "Distribution:\n");
+                    this->dists[j].print(0);
+                    exit(1);
+                }
+                if (llmax == 0 || ll[j] > llmax){
+                    llmax = ll[j];
+                    maxcomp = j;
+                }
+            }
+            else{
+                ll[j] = 0.0;
+            }
+        }
+        
+        for (int j = 0; j < n_components; ++j){
+            if (this->weights[j] > 0.0){
+                this->responsibility_matrix[i][j] = pow(2, ll[j] - llmax);
+                rowsum += this->responsibility_matrix[i][j];
+            }
+            else{
+                this->responsibility_matrix[i][j] = 0.0;
+            }
+        }
+        if (rowsum == 0){
+            rowsum = 1.0;
+        }
+        for (int j = 0; j < n_components; ++j){
+            // Normalize responsibility matrix entries for this row
+            this->responsibility_matrix[i][j] /= rowsum;
+            
+            if (this->hard){
+                // Track weight sums & observation weight sums only considering max-probable component.
+                if (j == maxcomp){
+                    member_weight_sums[j] += obs_weights[i];
+                    for (int k = 0; k < obs[i].size(); ++k){
+                        mean_sums[j][k] += obs[i][k] * obs_weights[i];
+                    }
+                }
+            }
+            else{
+                // Track weight sums for each component
+                member_weight_sums[j] += this->responsibility_matrix[i][j] * obs_weights[i];
+                if (isnan(member_weight_sums[j])){
+                    fprintf(stderr, "mws nan %d) j\n", j);
+                    fprintf(stderr, "w %f rm %f rs %f\n", obs_weights[i], responsibility_matrix[i][j],
+                        rowsum);
+                    exit(1);
+                } 
+
+                for (int k = 0; k < obs[i].size(); ++k){
+                    //mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
+                    //    log2(obs[i][k]) + log2(obs_weights[i]));
+                    mean_sums[j][k] += this->responsibility_matrix[i][j] * obs[i][k] * obs_weights[i];
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Should only be called internally. Returns log2 likelihood.
+ */
+double mixtureModel::M_step(const vector<vector<double> >& obs, vector<double>& obs_weights){
+    
+    // M-step: update parameters
+    for (int j = 0; j < n_components; ++j){
+        if (weights[j] > 0){
+            // Distribution weight
+            // This is already normalized by including the (normalized) observation weights
+            // in the sum
+            double new_weight = member_weight_sums[j] / obs_weight_scale;
+            if (isnan(new_weight)){
+                new_weight = 0.0;
+            }
+            this->weights[j] = new_weight;
+        
+            if (!e_only && new_weight > 0){
+                bool can_update = true;
+
+                // Compute summary statistics (mean and variance of each dimension of observations)
+                vector<double> means;
+                vector<double> vars;
+                map<pair<int, int>, double> covs;
+                                    
+                for (int k = 0; k < obs[0].size(); ++k){
+                    double mean = mean_sums[j][k] / member_weight_sums[j];
+                    
+                    if (dists[j].needs_cov){
+                        // We must compute covariances with other observations
+                        for (int l = k + 1; l < obs[0].size(); ++l){
+                            pair<int, int> key = make_pair(k, l);
+                            covs.insert(make_pair(key, 0.0));
+                        }
+                    }
+
+                    double var = 0.0;
+                    for (int i = 0; i < obs.size(); ++i){
+                        
+                        // If observation equals mean, this will contribute nothing
+                        // to variance and cause a NaN inside the logarithm
+                        if (obs[i][k] != mean && this->responsibility_matrix[i][j] != 0 &&
+                            obs_weights[i] != 0){
+                            double varlog = log2(this->responsibility_matrix[i][j]) + 
+                                2*log2(abs(obs[i][k] - mean)) + log2(obs_weights[i]);
+                            var += pow(2, varlog);
+                        }
+
+                        if (dists[j].needs_cov){
+                            for (int l = k + 1; l < obs[0].size(); ++l){
+                                pair<int, int> key = make_pair(k, l);
+                                double meanl = mean_sums[j][l] / member_weight_sums[j];
+                                if (obs[i][k] != mean && obs[i][l] != meanl && 
+                                    this->responsibility_matrix[i][j] != 0 && 
+                                    obs_weights[i] != 0){
+                                    // Can't take logarithm since we might have negative numbers
+                                    // here (not squaring)
+                                    double covar = this->responsibility_matrix[i][j] * 
+                                        (obs[i][k] - mean)*(obs[i][l] - meanl) * obs_weights[i];
+                                    covs[key] += covar;
+                                }
+                            }
+                        }
+
+                    }
+                    var /= weights[j];
+                    var /= obs_weight_scale;
+                    
+                    if (dists[j].needs_cov){
+                        for (map<pair<int, int>, double>::iterator c = covs.begin(); 
+                            c != covs.end(); ++c){
+                            c->second /= weights[j];
+                            c->second /= obs_weight_scale;
+                        }
+                    }
+
+                    if (isnan(mean) || isinf(mean)){
+                        fprintf(stderr, "mean %f %f\n", mean_sums[j][k], member_weight_sums[j]);
+                        fprintf(stderr, "%f\n", weights[j]);
+                        exit(1);
+                    }
+                    if (isnan(var) || isinf(var)){
+                        fprintf(stderr, "var %f %f %f\n", var, weights[j], obs_weight_scale);
+                        exit(1);
+                    }
+                    means.push_back(mean);
+                    vars.push_back(var);
+                    if (var <= 1e-8){
+                        can_update = false;
+                    }
+                }
+                
+                if (can_update){
+                    // Allow distribution to update using method of moments
+                    can_update = this->dists[j].update( means, vars, covs );
+                    if (!can_update){
+                        // Created illegal parameter values. Eliminate this
+                        // distribution.
+                        this->weights[j] = 0.0;
+                        
+                        // Give remaining weight to other components
+                        double weightsum = 0.0;
+                        for (int j2 = 0; j2 < n_components; ++j2){
+                            weightsum += this->weights[j2];
+                        }
+                        for (int j2 = 0; j2 < n_components; ++j2){
+                            this->weights[j2] /= weightsum;
+                        }
+                    }
+                }
+            }
+        } 
+    }
+    // Let external functions hook into the update process
+    if (this->has_callback_fun){
+        this->callback_fun(*this, this->shared_params);
+        /*
+        vector<mixtureDist*> distvec;
+        for (int i = 0; i < this->dists.size(); ++i){
+            distvec.push_back(&this->dists[i]);
+        }
+        this->callback_fun(distvec, this->weights, this->shared_params);
+        */
+    }
+    
+    for (int j = 0; j < this->weights.size(); ++j){
+        if (this->weights[j] == 1.0){
+            one_component = true;
+            break;
+        }
+    }
+    double loglik = this->compute_loglik(obs, obs_weights); 
+    if (isinf(loglik)){
+        fprintf(stderr, "LL inf\n");
+        exit(1);
+    }
+    if (isnan(loglik)){
+        fprintf(stderr, "ERROR: log likelihood NaN\n");
+        this->print();
+        exit(1);
+    }
+    return loglik;
+}
+
+/**
+ * Initialize stuff before fitting
+ */
+void mixtureModel::begin_fit(const vector<vector<double> >& obs, vector<double>& obs_weights){
     if (this->n_components < 0){
         fprintf(stderr, "ERROR: model not initialized\n");
         exit(1);
@@ -361,56 +623,28 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     }
 
     // How many observations in data set?
-    long int n_sites = obs.size();
+    n_sites = obs.size();
     
     if (n_sites == 0){
         fprintf(stderr, "ERROR: cannot fit mixture model on 0 sites\n");
         exit(1);
     }
-    // Is every component distribution frozen -- i.e. no need to update?
-    bool all_frozen = true;
-    for (int j = 0; j < this->n_components; ++j){
-        if (e_only){
-            this->dists[j].frozen = true;
-        }
-        if (!this->dists[j].frozen){
-            all_frozen = false;
-            break;
-        }
-    }
     
-    // How many component distributions?
-    if (n_components <= 1){
-        return this->fit_single(obs, obs_weights);
-    }
+    
     // Need to create "responsibility matrix," storing the likelihoods of 
     // observations under each distribution multiplied by distribution weight
     // and normalized so that rows sum to 1. We make this accessible to outside
     // users, but need to remember to properly initialize and free it.
     this->init_responsibility_matrix(n_sites);
     
-    // What are the stopping criteria?
-    double delta_thresh = this->delta_thresh;
-    int max_its = this->maxits;
-
-    // Useful reference: https://stephens999.github.io/fiveMinuteStats/intro_to_em.html
-    
-    double delta = 99;
-    int its = 0;
-    double loglik_prev = 0.0;
-
     // Keep track of the mean of each dimension of each observation under each component dist
-    double member_weight_sums[n_components];
-    double** mean_sums = new double*[n_components];
+    //double member_weight_sums[n_components];
+    //member_weight_sums = (double) malloc(n_components * sizeof(double));
+    member_weight_sums = new double[n_components];
+    mean_sums = new double*[n_components];
     for (int j = 0; j < n_components; ++j){
         mean_sums[j] = new double[obs[0].size()]; 
     }
-    
-    // How small can the variance be before the component is zeroed out? 
-    float var_thresh = 0.0;
-
-    // Has the model reached a point where it only contains one component?
-    bool one_component = false;
     
     // Make observation weights sum to num observations (this will keep weights from throwing off
     // BIC calculation)
@@ -420,7 +654,7 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
     }
     // Try to prevent underflow by scaling things up by this number
     // (will divide later)
-    double obs_weight_scale = (double)obs_weights.size();
+    obs_weight_scale = (double)obs_weights.size();
     for (int i = 0; i < obs_weights.size(); ++i){
         //obs_weights[i] /= obs_weight_sum;
         if (obs_weights[i] > 0){
@@ -431,258 +665,15 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
             }
         }
     }
-    while (delta > delta_thresh && its < max_its && !one_component){
-        
-        // E - step: determine membership weights. 
-        // Keep track of means of each component of each observation
-        for (int j = 0; j < n_components; ++j){
-            member_weight_sums[j] = 0.0;
-            for (int k = 0; k < obs[0].size(); ++k){
-                mean_sums[j][k] = 0.0;
-            }
-        }
-        for (int i = 0; i < n_sites; ++i){
-            if (obs_weights[i] == 0.0){
-                continue;
-            }
-            double rowsum = 0;
-            // Prevent underflow by dividing densities by the smallest density encountered
-            double llmax = 0;
-            double ll[n_components];
-            for (int j = 0; j < n_components; ++j){
-                if (this->weights[j] > 0.0){
-                    ll[j] = log2(weights[j]) + this->dists[j].loglik(obs[i]);
-                    if (isnan(ll[j]) || isinf(ll[j])){
-                        fprintf(stderr, "Invalid log likelihood returned by distribution!\n");
-                        fprintf(stderr, "weight %f\n", weights[j]);
-                        fprintf(stderr, "Input:\n");
-                        for (int k = 0; k < obs[i].size(); ++k){
-                            fprintf(stderr, "%f ", obs[i][k]);
-                        }
-                        fprintf(stderr, "\n");
-                        fprintf(stderr, "Distribution:\n");
-                        this->dists[j].print(0);
-                        exit(1);
-                    }
-                    if (llmax == 0 || ll[j] > llmax){
-                        llmax = ll[j];
-                    }
-                }
-                else{
-                    ll[j] = 0.0;
-                }
-            }
-            for (int j = 0; j < n_components; ++j){
-                if (this->weights[j] > 0.0){
-                    this->responsibility_matrix[i][j] = pow(2, ll[j] - llmax);
-                    rowsum += this->responsibility_matrix[i][j];
-                }
-                else{
-                    this->responsibility_matrix[i][j] = 0.0;
-                }
-            }
-            if (rowsum == 0){
-                rowsum = 1.0;
-            }
+}
 
-            if (its == 0){
-                // Compute log likelihood for initial fit.
-                loglik_prev += log2(rowsum) + llmax;    
-            }
-            for (int j = 0; j < n_components; ++j){
-                // Normalize responsibility matrix entries for this row
-                this->responsibility_matrix[i][j] /= rowsum;
+/**
+ * Free stuff after fitting
+ */
+void mixtureModel::end_fit(){
+    this->assignments.clear();
+    this->assignments.reserve(n_obs);
 
-                // Track weight sums for each component
-                member_weight_sums[j] += this->responsibility_matrix[i][j] * obs_weights[i];
-                if (isnan(member_weight_sums[j])){
-                    fprintf(stderr, "mws nan %d) j\n", j);
-                    fprintf(stderr, "w %f rm %f rs %f\n", obs_weights[i], responsibility_matrix[i][j],
-                        rowsum);
-                    exit(1);
-                } 
-
-                for (int k = 0; k < obs[i].size(); ++k){
-                    //mean_sums[j][k] += pow(2, log2(this->responsibility_matrix[i][j]) + 
-                    //    log2(obs[i][k]) + log2(obs_weights[i]));
-                    mean_sums[j][k] += this->responsibility_matrix[i][j] * obs[i][k] * obs_weights[i];
-                }
-            }
-        }
-
-        // M-step: update parameters
-        for (int j = 0; j < n_components; ++j){
-            if (weights[j] > 0){
-                // Distribution weight
-                // This is already normalized by including the (normalized) observation weights
-                // in the sum
-                double new_weight = member_weight_sums[j] / obs_weight_scale;
-                if (isnan(new_weight)){
-                    new_weight = 0.0;
-                }
-                this->weights[j] = new_weight;
-            
-                if (!e_only && new_weight > 0){
-                    bool can_update = true;
-
-                    // Compute summary statistics (mean and variance of each dimension of observations)
-                    vector<double> means;
-                    vector<double> vars;
-                    map<pair<int, int>, double> covs;
-                                        
-                    for (int k = 0; k < obs[0].size(); ++k){
-                        double mean = mean_sums[j][k] / member_weight_sums[j];
-                        
-                        if (dists[j].needs_cov){
-                            // We must compute covariances with other observations
-                            for (int l = k + 1; l < obs[0].size(); ++l){
-                                pair<int, int> key = make_pair(k, l);
-                                covs.insert(make_pair(key, 0.0));
-                            }
-                        }
-
-                        double var = 0.0;
-                        for (int i = 0; i < obs.size(); ++i){
-                            
-                            // If observation equals mean, this will contribute nothing
-                            // to variance and cause a NaN inside the logarithm
-                            if (obs[i][k] != mean && this->responsibility_matrix[i][j] != 0 &&
-                                obs_weights[i] != 0){
-                                double varlog = log2(this->responsibility_matrix[i][j]) + 
-                                    2*log2(abs(obs[i][k] - mean)) + log2(obs_weights[i]);
-                                var += pow(2, varlog);
-                            }
-
-                            if (dists[j].needs_cov){
-                                for (int l = k + 1; l < obs[0].size(); ++l){
-                                    pair<int, int> key = make_pair(k, l);
-                                    double meanl = mean_sums[j][l] / member_weight_sums[j];
-                                    if (obs[i][k] != mean && obs[i][l] != meanl && 
-                                        this->responsibility_matrix[i][j] != 0 && 
-                                        obs_weights[i] != 0){
-                                        // Can't take logarithm since we might have negative numbers
-                                        // here (not squaring)
-                                        double covar = this->responsibility_matrix[i][j] * 
-                                            (obs[i][k] - mean)*(obs[i][l] - meanl) * obs_weights[i];
-                                        covs[key] += covar;
-                                    }
-                                }
-                            }
-
-                        }
-                        var /= weights[j];
-                        var /= obs_weight_scale;
-                        
-                        if (dists[j].needs_cov){
-                            for (map<pair<int, int>, double>::iterator c = covs.begin(); 
-                                c != covs.end(); ++c){
-                                c->second /= weights[j];
-                                c->second /= obs_weight_scale;
-                            }
-                        }
-
-                        if (isnan(mean) || isinf(mean)){
-                            fprintf(stderr, "mean %f %f\n", mean_sums[j][k], member_weight_sums[j]);
-                            fprintf(stderr, "%f\n", weights[j]);
-                            exit(1);
-                        }
-                        if (isnan(var) || isinf(var)){
-                            fprintf(stderr, "var %f %f %f\n", var, weights[j], obs_weight_scale);
-                            exit(1);
-                        }
-                        means.push_back(mean);
-                        vars.push_back(var);
-                        if (var <= 1e-8){
-                            can_update = false;
-                        }
-                    }
-                    
-                    if (can_update){
-                        // Allow distribution to update using method of moments
-                        can_update = this->dists[j].update( means, vars, covs );
-                        if (!can_update){
-                            // Created illegal parameter values. Eliminate this
-                            // distribution.
-                            this->weights[j] = 0.0;
-                            
-                            // Give remaining weight to other components
-                            double weightsum = 0.0;
-                            for (int j2 = 0; j2 < n_components; ++j2){
-                                weightsum += this->weights[j2];
-                            }
-                            for (int j2 = 0; j2 < n_components; ++j2){
-                                this->weights[j2] /= weightsum;
-                            }
-                        }
-                    }
-                }
-            } 
-        }
-        // Let external functions hook into the update process
-        if (this->has_callback_fun){
-            this->callback_fun(*this, this->shared_params);
-            /*
-            vector<mixtureDist*> distvec;
-            for (int i = 0; i < this->dists.size(); ++i){
-                distvec.push_back(&this->dists[i]);
-            }
-            this->callback_fun(distvec, this->weights, this->shared_params);
-            */
-        }
-        
-        for (int j = 0; j < this->weights.size(); ++j){
-            if (this->weights[j] == 1.0){
-                one_component = true;
-                break;
-            }
-        }
-        double loglik = this->compute_loglik(obs, obs_weights); 
-        if (isinf(loglik)){
-            fprintf(stderr, "LL inf\n");
-            exit(1);
-        }
-        if (this->print_lls){
-            fprintf(stderr, "LL %.3f -> %.3f (Improvement: %.3f)\n", loglik_prev/log2(exp(1)), 
-                loglik/log2(exp(1)), (loglik-loglik_prev)/log2(exp(1)));
-            if (this->print_dists){
-                fprintf(stderr, "\n");
-                this->print();
-                fprintf(stderr, "\n");
-            }
-        }
-
-        //delta = abs(loglik-loglik_prev);
-        if (all_frozen){
-            delta = 0.0;
-        }
-        else{
-            delta = loglik-loglik_prev;
-            if (isnan(delta)){
-                fprintf(stderr, "delta NAN %f %f\n", loglik_prev, loglik);
-                this->print();
-                exit(1);
-            }
-        }
-
-        loglik_prev = loglik;
-        ++its;
-
-    }
-    
-    if (this->print_lls){
-        if (delta <= delta_thresh){
-            fprintf(stderr, "Converged in %d iterations\n", its);
-        }
-        else{
-            fprintf(stderr, "Did not converge!\n");
-            fprintf(stderr, "\titeration %d max %d\n", its, max_its);
-            fprintf(stderr, "\tdelta %.3f thresh %.3f\n", delta, delta_thresh);
-            fprintf(stderr, "\tweights:\n");
-            for (int j = 0; j < this->weights.size(); ++j){
-                fprintf(stderr, "\t\t%.3f\n", this->weights[j]);
-            }
-        }
-    }
     // Assign observations to likeliest component of origin.
     for (int i = 0; i < n_sites; ++i){
         double maxweight = 0;
@@ -700,12 +691,128 @@ double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs
         mean_sums[j] = NULL;
     }
     delete[] mean_sums;
+    delete[] member_weight_sums;
+}
+
+double mixtureModel::fit(const vector<vector<double> >& obs, vector<double>& obs_weights){
+    
+    begin_fit(obs, obs_weights);
+
+    // How many component distributions?
+    if (n_components <= 1){
+        return this->fit_single(obs, obs_weights);
+    }
+    
+    // Is every component distribution frozen -- i.e. no need to update?
+    bool all_frozen = true;
+    for (int j = 0; j < this->n_components; ++j){
+        if (e_only){
+            this->dists[j].frozen = true;
+        }
+        if (!this->dists[j].frozen){
+            all_frozen = false;
+            break;
+        }
+    }
+    
+    // What are the stopping criteria?
+    double delta_thresh = this->delta_thresh;
+    int max_its = this->maxits;
+
+    // Useful reference: https://stephens999.github.io/fiveMinuteStats/intro_to_em.html
+    
+    double delta = 99;
+    int its = 0;
+    double loglik_prev = 0.0;
+
+    // How small can the variance be before the component is zeroed out? 
+    float var_thresh = 0.0;
+
+    // Has the model reached a point where it only contains one component?
+    one_component = false;
+    
+    
+    while (delta > delta_thresh && its < max_its && !one_component){
+        
+        // E - step: determine membership weights. 
+        E_step(obs, obs_weights);        
+        
+        // M - step: update distribution parameters.    
+        loglik = M_step(obs, obs_weights);
+
+        if (this->print_lls){
+            fprintf(stderr, "LL %.3f -> %.3f (Improvement: %.3f)\n", loglik_prev/log2(exp(1)), 
+                loglik/log2(exp(1)), (loglik-loglik_prev)/log2(exp(1)));
+            if (this->print_dists){
+                fprintf(stderr, "\n");
+                this->print();
+                fprintf(stderr, "\n");
+            }
+        }
+
+        //delta = abs(loglik-loglik_prev);
+        if (all_frozen){
+            delta = 0.0;
+        }
+        else{
+            // On iteration 0, we don't yet know the log likelihood.
+            if (its > 0){
+                delta = loglik-loglik_prev;
+            }
+            if (isnan(delta)){
+                fprintf(stderr, "delta NAN %f %f\n", loglik_prev, loglik);
+                this->print();
+                exit(1);
+            }
+        }
+
+        loglik_prev = loglik;
+        ++its;
+    }
+    
+    if (this->print_lls){
+        if (delta <= delta_thresh){
+            fprintf(stderr, "Converged in %d iterations\n", its);
+        }
+        else{
+            fprintf(stderr, "Did not converge!\n");
+            fprintf(stderr, "\titeration %d max %d\n", its, max_its);
+            fprintf(stderr, "\tdelta %.3f thresh %.3f\n", delta, delta_thresh);
+            fprintf(stderr, "\tweights:\n");
+            for (int j = 0; j < this->weights.size(); ++j){
+                fprintf(stderr, "\t\t%.3f\n", this->weights[j]);
+            }
+        }
+    }
+    
+    end_fit();
+
     // Store log likelihood of fit model
     this->loglik = loglik_prev;
     // Compute BIC and AIC
     this->compute_bic(obs.size() * obs[0].size());    
     return loglik_prev;
    
+}
+
+/**
+ * Just run one E-step to fill responsibility matrix (do not update distributions)
+ */
+void mixtureModel::compute_probs(const std::vector<std::vector<double> >& obs){
+    vector<double> w;
+    for (int i = 0; i < obs.size(); ++i){
+        w.push_back(1.0);
+    }
+    compute_probs(obs, w);
+}
+
+/**
+ * Just run one E-step to fill responsibility matrix (do not update distributions)
+ */
+void mixtureModel::compute_probs(const std::vector<std::vector<double> >& obs, std::vector<double>& obs_weights){
+    begin_fit(obs, obs_weights);
+    E_step(obs, obs_weights);
+    end_fit();
 }
 
 void mixtureModel::trigger_callback(){
@@ -749,6 +856,19 @@ double mixtureModel::compute_loglik(const vector<vector<double> >& obs, vector<d
                     ll_row[j] += log2(this->weights[j]);
                 }
                 ll_row[j] += this->dists[j].loglik( obs[i] );
+                if (isinf(ll_row[j]) || isnan(ll_row[j])){
+                    fprintf(stderr, "ERROR: NaN in component log likelihood:\n");
+                    this->dists[j].print();
+                    fprintf(stderr, "observation row:\n");
+                    for (int x = 0; x < obs[i].size(); ++x){
+                        if (x > 0){
+                            fprintf(stderr, "\t");
+                        }
+                        fprintf(stderr, "%f", obs[i][x]);
+                    }
+                    fprintf(stderr, "\n");
+                    exit(1);
+                }
                 if (ll_row_max == 0.0 || ll_row[j] > ll_row_max){
                     ll_row_max = ll_row[j];
                 }
@@ -792,6 +912,227 @@ void mixtureModel::compute_bic(long int n_obs){
     
     this->bic = (float)n_params * log(n_obs) - 2.0 * (this->loglik / log2(exp(1)));
     this->aic = 2.0 * (float)n_params - 2.0 * (this->loglik / log2(exp(1)));
+}
+
+
+bool mixtureModel::rm_component(int idx){
+    if (idx < 0 || idx > n_components-1){
+        fprintf(stderr, "Invalid component idx %d\n", idx);
+        return false;
+    }
+    int i = 0;
+    vector<mixtureDist>::iterator d = dists.begin();
+    vector<double>::iterator w = weights.begin();
+    double wsum = 0.0;
+    while (i <= idx){
+        if (i == idx){
+            dists.erase(d);
+            weights.erase(w);
+            break;
+        }
+        else{
+            ++d;
+            wsum += *w;
+            ++w;
+        }
+        ++i;
+    }
+
+    // Re-distribute weights
+    if (wsum > 0.0){
+        for (int wx = 0; wx < weights.size(); ++wx){
+            weights[wx] /= wsum;
+        }
+    }
+    
+    n_components--;
+
+    // Fix responsibility matrix
+    if (n_obs > 0 && responsibility_matrix != NULL){
+        this->assignments.clear();
+        for (int i = 0; i < n_obs; ++i){
+            double* newrow = new double[this->n_components];
+            double rowsum = 0.0;
+            int newj = 0;
+            double mv = 0.0;
+            int newmax = -1;
+            for (int j = 0 ; j < this->n_components+1; ++j){
+                if (j != idx){
+                    if (newmax == -1 || responsibility_matrix[i][j] > mv){
+                        mv = responsibility_matrix[i][j];
+                        newmax = newj;
+                    }
+                    rowsum += responsibility_matrix[i][j];
+                    newrow[newj] = responsibility_matrix[i][j];
+                    ++newj;
+                }
+            }
+            if (rowsum == 0.0){
+                rowsum = 1.0;
+            }
+            for (int j = 0; j < this->n_components; ++j){
+                newrow[j] /= rowsum;
+            }
+            this->assignments.push_back(newmax);
+            delete[] this->responsibility_matrix[i];
+            this->responsibility_matrix[i] = newrow;
+        }
+    }
+    return true;
+}
+
+/**
+ * Compute Pearson's r between two columns of the responsibility matrix
+ */
+double mixtureModel::corr(int i, int j){
+    if (n_obs == -1 || responsibility_matrix == NULL){    
+        fprintf(stderr, "ERROR: must initialize & fit data first\n");
+        exit(1);
+    }
+    if (i < 0 || i > n_components - 1){
+        fprintf(stderr, "ERROR: component %d out of range with %d components\n", i, n_components);
+        exit(1);
+    }
+    if (j < 0 || j > n_components - 1){
+        fprintf(stderr, "ERROR: component %d out of range with %d components\n", j, n_components);
+        exit(1);
+    }
+    double num = 0.0;
+    double denom_i = 0.0;
+    double denom_j = 0.0;
+    for (int k = 0; k < n_obs; ++k){
+        double w = 1.0;
+        double x_i = responsibility_matrix[k][i] - weights[i];
+        double x_j = responsibility_matrix[k][j] - weights[j];
+        
+        num += w * x_i * x_j;
+        denom_i += w * x_i * x_i;
+        denom_j += w * x_j * x_j;
+    }
+    if (denom_i*denom_j == 0){
+        return 0;
+    }
+    double r = num / sqrt(denom_i*denom_j);
+    return r;
+}
+
+std::vector<int> mixtureModel::rm_correlated_components(double cutoff){
+    if (n_obs == -1 || responsibility_matrix == NULL){    
+        fprintf(stderr, "ERROR: must initialize & fit data first\n");
+        exit(1);
+    }
+
+    vector<int> comp_rm;
+    
+    // Remove 0-weight components
+    for (int j = 0; j < weights.size(); ++j){
+        if (weights[j] == 0.0){
+            comp_rm.push_back(j);
+        }
+    }
+    for (vector<int>::reverse_iterator it = comp_rm.rbegin(); it != comp_rm.rend(); ++it){
+        rm_component(*it);
+    }
+
+    map<pair<int, int>, double> corr_num;
+    map<int, double> corr_denom;
+    for (int i = 0; i < weights.size(); ++i){
+        corr_denom.insert(make_pair(i, 0.0));
+        for (int j = i + 1; j < weights.size(); ++j){
+            corr_num.insert(make_pair(make_pair(i,j), 0.0));
+        }
+    }
+    
+    for (int i = 0; i < n_obs; ++i){
+        double w = 1.0;
+        /*
+        if (weights_global.size() > 0){
+            w = weights_global[i];
+        }
+        */
+        for (int j = 0; j < weights.size(); ++j){
+            double elt1 = pow(responsibility_matrix[i][j] - weights[j], 2);
+            corr_denom[j] += w * elt1;
+            for (int k = j + 1; k < weights.size(); ++k){
+                pair<int, int> key = make_pair(j,k);
+                double elt2 = (responsibility_matrix[i][j] - weights[j]) * 
+                    (responsibility_matrix[i][k] - weights[k]);
+                corr_num[key] += w * elt2;
+            }
+        }
+    }
+    /*
+    if (component_weights.size() > 0){
+        for (map<int, double>::iterator cd = corr_denom.begin(); cd != corr_denom.end(); ++cd){
+            cd->second /= weightsum;
+        }
+    }
+    */
+    double wsum = 1.0;
+    /*
+    if (component_weights.size() > 0){
+        wsum = weightsum;
+    }
+    */
+    // Track maximum sum of positive correlations per component in which
+    // that component is the "loser" (lower weight of the two)
+    double maxpos = 0.0;
+    int maxposcomp = -1;
+    map<int, double> r2sumpos;
+    
+    for (map<pair<int, int>, double>::iterator cn = corr_num.begin(); cn != corr_num.end(); ++cn){
+        cn->second /= wsum;
+        // Calculate Pearson correlation
+        double r = cn->second / sqrt(corr_denom[cn->first.first]*corr_denom[cn->first.second]);
+        if (r > cutoff){
+            // Add weight to the loser component (lower model weight)
+            if (weights[cn->first.first] < weights[cn->first.second]){
+                
+                fprintf(stderr, "remove %s (corr %s = %f)\n", dists[cn->first.first].name.c_str(),
+                        dists[cn->first.second].name.c_str(), r);
+
+                if (r2sumpos.count(cn->first.first) == 0){
+                    r2sumpos.insert(make_pair(cn->first.first, 0.0));
+                }
+                r2sumpos[cn->first.first] += r;
+                if (r2sumpos[cn->first.first] > maxpos){
+                    maxpos = r2sumpos[cn->first.first];
+                    maxposcomp = cn->first.first;
+                }
+            }
+            else{
+                
+                fprintf(stderr, "remove %s (corr %s = %f)\n", dists[cn->first.second].name.c_str(),
+                        dists[cn->first.first].name.c_str(), r);
+
+                r2sumpos[cn->first.second] += r;
+                if (r2sumpos[cn->first.second] > maxpos){
+                    maxpos = r2sumpos[cn->first.second];
+                    maxposcomp = cn->first.second;
+                }
+            }
+        }         
+    }
+    if (maxposcomp >= 0){
+        // Eliminate ALL pos components?
+        for (map<int, double>::reverse_iterator r2s = r2sumpos.rbegin(); r2s != 
+            r2sumpos.rend(); ++r2s){
+            comp_rm.push_back(r2s->first);
+            rm_component(r2s->first);
+        }
+        // Eliminate the chosen component.
+        //rm_component(maxposcomp);
+        
+        //reset_params(); 
+        //fit();
+    }
+    else{
+        // Finished
+        return comp_rm;
+    }
+    //}
+    // Ran out of components to eliminate
+    return comp_rm;
 }
 
 double mixtureModel::fit_single(const vector<vector<double> >& obs, vector<double>& obs_weights){
@@ -877,6 +1218,11 @@ with dummy parameters. This is necessary to judge how many parameters are being 
     
     this->weights.clear();
     this->weights.push_back(1.0);
+    
+    this->assignments.clear();
+    for (int i = 0; i < obs.size(); ++i){
+        this->assignments.push_back(0);
+    }
 
     // Compute the log likelihood of the model
     double loglik = compute_loglik(obs, obs_weights);

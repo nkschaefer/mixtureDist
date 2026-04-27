@@ -101,6 +101,41 @@ double digamma(double x){
 }
 
 /**
+ * Trigamma function (base e, not base 2)
+ * Adapted from Julia code written by John Myles White under MIT license
+ * (https://gist.github.com/johnmyleswhite/5682534#file-trigamma-jl)
+ *
+ * Implementation of algorithm described in
+ * "Algorithm AS 121: Trigamma Function" by B. E. Schneider, 1978
+ */
+double trigamma(double x){
+    double trigam = 0.0;
+    double z = x;
+    if (x <= 0.0){
+        fprintf(stderr, "ERROR: x out of domain for trigamma\n");
+        exit(1);
+    }
+
+    if (x <= 1e-4){
+        return 1.0 / (z * z);
+    }
+
+    while (z < 5.0){
+        trigam += 1.0 / (z * z);
+        z += 1.0;
+    }
+
+    double y = 1.0 / (z * z);
+    return trigam +
+           0.5 * y +
+           (1.0 +
+            y * (1.0 / 6.0 +
+            y * (-1.0 / 30.0 +
+            y * (1.0 / 42.0 +
+            y * -1.0 / 30.0)))) / z;
+}
+
+/**
  * Welford's algorithm for computing mean and variance in a single pass
  * Returns pair of (mean, variance)
  */

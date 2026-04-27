@@ -230,6 +230,18 @@ class mixtureDist{
             std::vector<double>& params,
             const std::vector<bool>& params_frozen,
             const bool all_frozen );
+        static double ll_uniform( const std::vector<double>& input,
+            int start_idx,
+            int n_inputs,
+            const std::vector<double>& vars);
+        static bool update_uniform( const std::vector<double>& means,
+            const std::vector<double>& vars,
+            const std::map<std::pair<int, int>, double>& covs,
+            int start_idx,
+            int n_inputs,
+            std::vector<double>& params,
+            const std::vector<bool>& params_frozen,
+            const bool all_frozen );
         static double ll_negbin( const std::vector<double>& input,
             int start_idx,
             int n_inputs,
