@@ -813,6 +813,9 @@ void mixtureModel::compute_probs(const std::vector<std::vector<double> >& obs, s
     begin_fit(obs, obs_weights);
     E_step(obs, obs_weights);
     end_fit();
+    double loglik = compute_loglik(obs, obs_weights);
+    this->loglik = loglik;
+    compute_bic(obs.size());
 }
 
 void mixtureModel::trigger_callback(){
@@ -1234,7 +1237,8 @@ with dummy parameters. This is necessary to judge how many parameters are being 
         }
         exit(1);
     }
-    this->compute_bic(obs.size() * obs[0].size());
+    //this->compute_bic(obs.size() * obs[0].size());
+    this->compute_bic(obs.size());
     return loglik;
 }
 
