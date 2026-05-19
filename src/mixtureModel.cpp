@@ -1091,9 +1091,6 @@ std::vector<int> mixtureModel::rm_correlated_components(double cutoff){
             // Add weight to the loser component (lower model weight)
             if (weights[cn->first.first] < weights[cn->first.second]){
                 
-                fprintf(stderr, "remove %s (corr %s = %f)\n", dists[cn->first.first].name.c_str(),
-                        dists[cn->first.second].name.c_str(), r);
-
                 if (r2sumpos.count(cn->first.first) == 0){
                     r2sumpos.insert(make_pair(cn->first.first, 0.0));
                 }
@@ -1105,9 +1102,6 @@ std::vector<int> mixtureModel::rm_correlated_components(double cutoff){
             }
             else{
                 
-                fprintf(stderr, "remove %s (corr %s = %f)\n", dists[cn->first.second].name.c_str(),
-                        dists[cn->first.first].name.c_str(), r);
-
                 r2sumpos[cn->first.second] += r;
                 if (r2sumpos[cn->first.second] > maxpos){
                     maxpos = r2sumpos[cn->first.second];

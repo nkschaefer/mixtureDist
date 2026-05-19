@@ -552,6 +552,13 @@ double pnbinom(double x, double mu, double phi){
 }
 
 /**
+ * Expose incomplete beta function
+ */
+double ib(double a, double b, double x){
+   return incbeta(a, b, x); 
+}
+
+/**
  * Fit negative binomial distribution using method of moments
  */
 pair<double, double> nbinom_moments(double mean, double var){
